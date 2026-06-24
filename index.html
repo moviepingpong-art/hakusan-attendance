@@ -76,6 +76,26 @@
   .card-msg.ok{color:var(--maru); font-weight:700;}
   .card-msg.ng{color:var(--batsu); font-weight:700;}
 
+  /* 初回の名前選択画面 */
+  .reg{padding:18px 16px;}
+  .reg h2{font-size:18px; margin:0 0 6px;}
+  .reg p.lead{font-size:14px; color:var(--sub); margin:0 0 16px;}
+  .names{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .nbtn{
+    border:2px solid var(--line); border-radius:11px; padding:16px 8px;
+    text-align:center; font-size:17px; background:#fff; cursor:pointer; user-select:none;
+  }
+  .nbtn:active{transform:scale(.98);}
+  .nbtn.sel{border-color:var(--brand); background:#e8f1f9; color:var(--brand-d); font-weight:700;}
+  .reg-confirm{
+    margin:18px 0 0; padding:15px; width:100%;
+    background:var(--brand); color:#fff; border:none; border-radius:12px;
+    font-size:17px; font-weight:700; cursor:pointer;
+  }
+  .reg-confirm:disabled{background:#9bb4c8;}
+  .reg-msg{margin:10px 0 0; font-size:14px; min-height:1.2em;}
+  .reg-msg.ng{color:var(--batsu); font-weight:700;}
+
   .state{padding:48px 24px; text-align:center; color:var(--sub);}
   .state.err{color:var(--batsu);}
   .spinner{
@@ -104,7 +124,7 @@
 <script>
 /* ===== ここだけ設定してください ===== */
 const LIFF_ID = "2010475547-nDT2DLT8";
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxvZzyuit5ULki-wlrflowdnKsam_4Wl7MoKMNyP0uJ8LpaAhQkagphRLrE7fVH5v8E/exec";   // ← 裏方GASのウェブアプリURL
+const GAS_URL = "ここに .../exec のURLを貼る";   // ← 裏方GASのウェブアプリURL
 /* ==================================== */
 
 const CHOICES = [
@@ -115,6 +135,7 @@ const CHOICES = [
 
 let profile = null;        // {userId, displayName}
 const picks = {};          // picks[大会ID][種目] = "〇"|"×"|"△"
+let chosenName = null;     // 初回選択した名前（一時保持）
 
 main();
 
@@ -125,15 +146,74 @@ async function main(){
     profile = await liff.getProfile();
     document.getElementById("me").innerHTML =
       `回答者：<b>${escapeHtml(profile.displayName)}</b> さん`;
-    await loadTournaments();
+
+    // 登録済みか確認 → 未登録なら名前選択画面、登録済みなら出欠へ
+    const who = await fetchJson(GAS_URL + "?action=whoami&userId=" + encodeURIComponent(profile.userId));
+    if(who.ok && who.registered){
+      await loadTournaments();
+    }else{
+      await showNamePicker();
+    }
   }catch(err){
     showState("読み込みに失敗しました。LINEからもう一度開いてください。<br><small>"+escapeHtml(String(err))+"</small>", true);
   }
 }
 
+/* ===== 初回：名前選択画面 ===== */
+async function showNamePicker(){
+  const data = await fetchJson(GAS_URL + "?action=members");
+  if(!data.ok) throw new Error(data.error || "名簿取得エラー");
+  const members = data.members || [];
+
+  const wrap = document.getElementById("wrap");
+  let html = `<div class="reg">
+      <h2>はじめての方へ</h2>
+      <p class="lead">名簿からあなたのお名前を選んで「これで登録」を押してください。<br>登録は最初の1回だけです。</p>
+      <div class="names" id="names">`;
+  members.forEach((n, i)=>{
+    html += `<div class="nbtn" data-i="${i}">${escapeHtml(n)}</div>`;
+  });
+  html += `</div>
+      <button class="reg-confirm" id="regBtn" disabled>これで登録</button>
+      <p class="reg-msg" id="regMsg"></p>
+    </div>`;
+  wrap.innerHTML = html;
+
+  const namesEl = document.getElementById("names");
+  const regBtn  = document.getElementById("regBtn");
+  namesEl.addEventListener("click", e=>{
+    const b = e.target.closest(".nbtn");
+    if(!b) return;
+    namesEl.querySelectorAll(".nbtn").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel");
+    chosenName = members[Number(b.dataset.i)];
+    regBtn.disabled = false;
+  });
+  regBtn.addEventListener("click", registerMe);
+}
+
+async function registerMe(){
+  const regBtn = document.getElementById("regBtn");
+  const msg = document.getElementById("regMsg");
+  if(!chosenName){ return; }
+  regBtn.disabled = true;
+  msg.className = "reg-msg";
+  msg.textContent = "登録中…";
+  try{
+    const body = { type:"register", userId:profile.userId, displayName:profile.displayName, chosenName:chosenName };
+    const data = await postJson(GAS_URL, body);
+    if(!data.ok) throw new Error(data.error || "登録エラー");
+    // 登録できたら、そのまま出欠フォームへ
+    await loadTournaments();
+  }catch(err){
+    msg.className = "reg-msg ng";
+    msg.textContent = "登録に失敗しました：" + String(err);
+    regBtn.disabled = false;
+  }
+}
+
 async function loadTournaments(){
-  const res = await fetch(GAS_URL);
-  const data = await res.json();
+  const data = await fetchJson(GAS_URL);
   if(!data.ok) throw new Error(data.error || "データ取得エラー");
 
   const list = data.tournaments || [];
@@ -227,13 +307,7 @@ async function submit(list, tid){
       taikaimei: t.taikaimei,
       answers: picks[tid],
     };
-    // GASはCORSプリフライトを避けるため text/plain で送る
-    const res = await fetch(GAS_URL, {
-      method:"POST",
-      headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
+    const data = await postJson(GAS_URL, body);
     if(!data.ok) throw new Error(data.error || "保存エラー");
 
     msg.className = "card-msg ok";
@@ -249,6 +323,19 @@ async function submit(list, tid){
 function showState(htmlText, isErr){
   document.getElementById("wrap").innerHTML =
     `<div class="state ${isErr?"err":""}">${htmlText}</div>`;
+}
+async function fetchJson(url){
+  const res = await fetch(url);
+  return await res.json();
+}
+async function postJson(url, body){
+  // GASはCORSプリフライトを避けるため text/plain で送る
+  const res = await fetch(url, {
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body: JSON.stringify(body),
+  });
+  return await res.json();
 }
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, m=>(
