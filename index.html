@@ -44,6 +44,12 @@
   .card-head h2{margin:0 0 6px; font-size:18px; line-height:1.4;}
   .meta{font-size:14px; color:var(--sub); margin:2px 0;}
   .meta .deadline{color:var(--batsu); font-weight:700;}
+  .youkou-btn{
+    display:inline-block; margin-top:10px; padding:9px 16px;
+    background:#fff; color:var(--brand-d); border:2px solid var(--brand);
+    border-radius:9px; font-size:15px; font-weight:700; text-decoration:none;
+  }
+  .youkou-btn:active{background:#e8f1f9;}
 
   .event{padding:14px 16px; border-bottom:1px solid #eef2f6;}
   .event:last-of-type{border-bottom:none;}
@@ -124,7 +130,7 @@
 <script>
 /* ===== ここだけ設定してください ===== */
 const LIFF_ID = "2010475547-nDT2DLT8";
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxvZzyuit5ULki-wlrflowdnKsam_4Wl7MoKMNyP0uJ8LpaAhQkagphRLrE7fVH5v8E/exec";   // ← 裏方GASのウェブアプリURL
+const GAS_URL = "ここに .../exec のURLを貼る";   // ← 裏方GASのウェブアプリURL
 /* ==================================== */
 
 const CHOICES = [
@@ -237,6 +243,7 @@ function renderForm(list){
         <h2>${escapeHtml(t.taikaimei)}</h2>
         ${t.kaisaibi  ? `<div class="meta">📅 開催：${escapeHtml(t.kaisaibi)}</div>`:""}
         ${t.shimekiri ? `<div class="meta deadline">⏰ 締切：${escapeHtml(t.shimekiri)}</div>`:""}
+        ${t.youkouUrl ? `<a class="youkou-btn" href="${escapeHtml(t.youkouUrl)}" target="_blank" rel="noopener">📄 要項を見る</a>`:""}
       </div>`;
 
     t.shumoku.forEach((sh, idx)=>{
