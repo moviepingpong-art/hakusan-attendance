@@ -48,8 +48,14 @@
     display:inline-block; margin-top:10px; padding:9px 16px;
     background:#fff; color:var(--brand-d); border:2px solid var(--brand);
     border-radius:9px; font-size:15px; font-weight:700; text-decoration:none;
+    cursor:pointer;
   }
   .youkou-btn:active{background:#e8f1f9;}
+  .youkou-box{margin-top:10px;}
+  .youkou-frame{
+    width:100%; height:70vh; border:1px solid var(--line);
+    border-radius:9px; background:#fff;
+  }
 
   .event{padding:14px 16px; border-bottom:1px solid #eef2f6;}
   .event:last-of-type{border-bottom:none;}
@@ -243,7 +249,8 @@ function renderForm(list){
         <h2>${escapeHtml(t.taikaimei)}</h2>
         ${t.kaisaibi  ? `<div class="meta">📅 開催：${escapeHtml(t.kaisaibi)}</div>`:""}
         ${t.shimekiri ? `<div class="meta deadline">⏰ 締切：${escapeHtml(t.shimekiri)}</div>`:""}
-        ${t.youkouUrl ? `<a class="youkou-btn" href="${escapeHtml(t.youkouUrl)}" target="_blank" rel="noopener">📄 要項を見る</a>`:""}
+        ${t.youkouUrl ? `<button type="button" class="youkou-btn" data-url="${escapeHtml(t.youkouUrl)}">📄 要項を見る</button>
+        <div class="youkou-box" hidden></div>`:""}
       </div>`;
 
     t.shumoku.forEach((sh, idx)=>{
@@ -267,6 +274,23 @@ function renderForm(list){
     card.querySelectorAll(".choices").forEach((grp, idx)=>{
       grp.dataset.shname = t.shumoku[idx];
     });
+
+    // 「要項を見る」→ フォーム内にPDFを開閉（別画面に飛ばない）
+    const yBtn = card.querySelector(".youkou-btn");
+    if(yBtn){
+      const box = card.querySelector(".youkou-box");
+      yBtn.addEventListener("click", ()=>{
+        const open = !box.hidden;
+        if(open){
+          box.hidden = true; box.innerHTML = "";
+          yBtn.textContent = "📄 要項を見る";
+        }else{
+          box.innerHTML = `<iframe class="youkou-frame" src="${yBtn.dataset.url}" loading="lazy"></iframe>`;
+          box.hidden = false;
+          yBtn.textContent = "✕ 要項を閉じる";
+        }
+      });
+    }
   });
 
   // 選択肢タップ
