@@ -63,6 +63,7 @@
     margin:0 0 18px; overflow:hidden; box-shadow:0 1px 3px rgba(20,50,80,.06);
   }
   .card-head{padding:16px 16px 12px; border-bottom:1px solid var(--line);}
+  .card-head.no-border{border-bottom:none;}
   .card-head h2{margin:0 0 6px; font-size:18px; line-height:1.4;}
   .meta{font-size:14px; color:var(--sub); margin:2px 0;}
   .meta.deadline{color:var(--batsu); font-weight:700;}
@@ -73,9 +74,16 @@
   }
   .st-done{color:var(--maru);    background:var(--maru-bg);}
   .st-part{color:var(--sankaku); background:var(--sankaku-bg);}
-  .st-none{color:var(--batsu);   background:var(--batsu-bg);}
 
-  /* 種目 行 */
+  /* 未回答の大会：大きく「未回答」だけ */
+  .unanswered{
+    margin:16px; padding:22px 16px; text-align:center;
+    background:var(--batsu-bg); border:2px dashed var(--batsu); border-radius:14px;
+  }
+  .unanswered .word{font-size:30px; font-weight:800; color:var(--batsu); letter-spacing:.08em;}
+  .unanswered .sub{font-size:14px; color:#8a241a; margin-top:6px;}
+
+  /* 種目 行（回答済みの大会） */
   .row{display:flex; align-items:center; gap:12px; padding:13px 16px; border-bottom:1px solid #eef2f6;}
   .row:last-of-type{border-bottom:none;}
   .row .name{flex:1; font-size:16.5px; font-weight:700; line-height:1.45; word-break:break-word;}
@@ -134,9 +142,9 @@
 
 <script>
 /* ===== 設定（変更不要） ===== */
-const LIFF_ID  = "2010475547-nDT2DLT8";  // 出欠フォームと同じLIFF
+const LIFF_ID  = "2010475547-YIPFjUme";  // このページ専用のLIFF「わたしの回答」
 const API_URL  = "https://script.google.com/macros/s/AKfycbwmS3DUX7BBmT2Vh7U3OkNWdD4Z5IWgLHOMIuqmkSfvMDrk7UBZNewfLsHCzFvq6-hv/exec";
-const FORM_URL = "https://liff.line.me/2010475547-nDT2DLT8";  // 「回答する・変更する」で開く出欠入力
+const FORM_URL = "https://liff.line.me/2010475547-nDT2DLT8";  // 「変更する」で開く出欠入力フォーム
 /* ============================ */
 
 const $list = document.getElementById("list");
@@ -153,7 +161,11 @@ document.addEventListener("visibilitychange", ()=>{
 (async function init(){
   try{
     await liff.init({liffId: LIFF_ID});
-    if(!liff.isLoggedIn()){ liff.login(); return; }
+    // 勝手にフォームへ飛ばさない：未ログインならその場に案内を出すだけ
+    if(!liff.isLoggedIn()){
+      showError("このページはLINEアプリから開いてください。");
+      return;
+    }
     const prof = await liff.getProfile();
     userId = prof.userId;
     window.__ready = true;
@@ -192,28 +204,40 @@ function render(items){
 }
 
 function cardHtml(t){
-  let stCls = "st-none", stTxt = "未回答";
-  if(t.allAnswered)   { stCls = "st-done"; stTxt = "回答済み"; }
-  else if(t.answered) { stCls = "st-part"; stTxt = "一部だけ回答"; }
+  const due = dueMeta(t.shimekiri);
+  const head =
+      '<div class="card-head' + (t.answered ? '' : ' no-border') + '">'
+    +   '<h2>' + esc(t.taikaimei) + '</h2>'
+    +   (t.kaisaibi  ? '<div class="meta">📅 開催：' + esc(t.kaisaibi) + '</div>' : "")
+    +   (t.shimekiri ? '<div class="meta deadline">⏰ 締切：' + esc(t.shimekiri) + due.suffix + '</div>' : "")
+    +   (t.answered ? statusPill(t) : "")
+    + '</div>';
 
+  // ── 未回答の大会：大きく「未回答」と表示するだけ（フォームへの導線なし）──
+  if(!t.answered){
+    return '<div class="card">' + head
+      + '<div class="unanswered">'
+      +   '<div class="word">未回答</div>'
+      +   '<div class="sub">この大会にはまだ回答していません</div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  // ── 回答済み／一部回答の大会：種目ごとの回答＋「変更する」ボタン ──
   const rows = (t.shumoku || []).map(s=>{
     const b = badge(s.answer);
     return '<div class="row"><div class="name">' + esc(s.name) + '</div>'
          + '<div class="badge ' + b.cls + '">' + b.txt + '</div></div>';
   }).join("");
 
-  const due = dueMeta(t.shimekiri);
-
-  return '<div class="card">'
-    + '<div class="card-head">'
-    +   '<h2>' + esc(t.taikaimei) + '</h2>'
-    +   (t.kaisaibi  ? '<div class="meta">📅 開催：' + esc(t.kaisaibi) + '</div>' : "")
-    +   (t.shimekiri ? '<div class="meta deadline">⏰ 締切：' + esc(t.shimekiri) + due.suffix + '</div>' : "")
-    +   '<div><span class="status ' + stCls + '">' + stTxt + '</span></div>'
-    + '</div>'
-    + rows
-    + '<a class="edit" href="' + FORM_URL + '">回答する・変更する</a>'
+  return '<div class="card">' + head + rows
+    + '<a class="edit" href="' + FORM_URL + '">回答を変更する</a>'
     + '</div>';
+}
+
+function statusPill(t){
+  if(t.allAnswered) return '<div><span class="status st-done">回答済み</span></div>';
+  return '<div><span class="status st-part">一部だけ回答</span></div>';
 }
 
 function badge(a){
