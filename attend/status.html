@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>出欠の状況</title>
+<link rel="stylesheet" href="attend.css">
+</head>
+<body>
+
+<header>
+  <h1>出欠の状況</h1>
+  <p id="org"></p>
+</header>
+
+<div class="bar"><button class="refresh" id="refreshBtn" type="button">最新に更新</button></div>
+<div class="wrap" id="wrap"></div>
+<p class="foot">※ 人数のみ表示しています（どなたが回答したかは表示されません）。締切前は途中経過のため変わります。</p>
+
+<script src="attend.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $wrap = document.getElementById('wrap');
+  var $org  = document.getElementById('org');
+  var esc = ATTEND.esc;
+
+  $wrap.innerHTML = ATTEND.loadingHtml();
+  if (ATTEND.requireDeployId($wrap)) return;
+
+  document.getElementById('refreshBtn').addEventListener('click', function () { load(true); });
+  load(false);
+
+  function load(isReload) {
+    $wrap.innerHTML = ATTEND.loadingHtml(isReload ? '更新しています…' : '読み込んでいます…');
+
+    // ?e= があればそのイベントだけ、なければ全イベント（締切後も含む）
+    ATTEND.get('summary', ATTEND.eventId ? { e: ATTEND.eventId } : null).then(function (data) {
+      if (data.org) {
+        $org.textContent = data.org;
+        document.title = '出欠の状況｜' + data.org;
+      }
+      render(data.summaries || []);
+    }).catch(function (err) {
+      $wrap.innerHTML = ATTEND.noteHtml('読み込めませんでした', String(err && err.message || err), true);
+    });
+  }
+
+  function render(list) {
+    if (!list.length) {
+      $wrap.innerHTML = ATTEND.noteHtml('表示できる出欠データがありません',
+        'イベントが登録されると、ここに集計が出ます。');
+      return;
+    }
+    $wrap.innerHTML = list.map(function (sum) {
+      return '<div class="card"><div class="card-head no-border">'
+        + '<h2>' + esc(sum.name) + '</h2>'
+        + ATTEND.metaHtml(sum)
+        + '</div>'
+        + ATTEND.summaryHtml(sum)
+        + '</div>';
+    }).join('');
+  }
+})();
+</script>
+</body>
+</html>

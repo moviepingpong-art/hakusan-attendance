@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>わたしの回答</title>
+<link rel="stylesheet" href="attend.css">
+</head>
+<body>
+
+<header>
+  <h1>わたしの回答</h1>
+  <p id="org"></p>
+</header>
+<div class="me" id="me"></div>
+
+<div class="legend">
+  <span class="lg-o"><b>〇</b> 参加</span>
+  <span class="lg-s"><b>△</b> どちらでも</span>
+  <span class="lg-x"><b>×</b> 不参加</span>
+  <span class="lg-n"><b>未回答</b> まだ答えていない</span>
+</div>
+<div class="bar"><button class="refresh" id="refreshBtn" type="button">最新に更新</button></div>
+
+<div class="wrap" id="wrap"></div>
+
+<script src="attend.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $wrap = document.getElementById('wrap');
+  var $me   = document.getElementById('me');
+  var $org  = document.getElementById('org');
+
+  var esc = ATTEND.esc;
+  var device = ATTEND.deviceId();
+  var formUrl = 'index.html?s=' + encodeURIComponent(ATTEND.deployId);
+
+  $wrap.innerHTML = ATTEND.loadingHtml();
+  if (ATTEND.requireDeployId($wrap)) return;
+
+  document.getElementById('refreshBtn').addEventListener('click', function () { load(true); });
+
+  // 回答フォームから戻ってきたら自動で最新化
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && window.__ready) load(true);
+  });
+
+  load(false);
+
+  function load(isReload) {
+    $wrap.innerHTML = ATTEND.loadingHtml(isReload ? '更新しています…' : '読み込んでいます…');
+
+    ATTEND.get('myanswers', { d: device }).then(function (data) {
+      window.__ready = true;
+      if (data.org) {
+        $org.textContent = data.org;
+        document.title = 'わたしの回答｜' + data.org;
+      }
+
+      if (!data.registered) {
+        $me.innerHTML = '<span>この端末はまだ名前の登録がありません</span>';
+        $wrap.innerHTML = ATTEND.noteHtml('まだ登録されていません',
+          '「出欠を回答する」ページを開いて、名簿からお名前を選んでください。登録は最初の1回だけです。')
+          + '<a class="ghost" href="' + esc(formUrl) + '">出欠を回答するページへ</a>';
+        return;
+      }
+
+      $me.innerHTML = '<span><b>' + esc(data.member.name) + '</b> さんの回答です</span>';
+      render(data.myanswers || []);
+    }).catch(function (err) {
+      $wrap.innerHTML = ATTEND.noteHtml('読み込めませんでした',
+        String(err && err.message || err), true);
+    });
+  }
+
+  function render(items) {
+    if (!items.length) {
+      $wrap.innerHTML = ATTEND.noteHtml('いま締切前のイベントはありません',
+        '新しいイベントが登録されると、ここに表示されます。');
+      return;
+    }
+    $wrap.innerHTML = items.map(cardHtml).join('');
+  }
+
+  function cardHtml(ev) {
+    var pill = ev.allAnswered
+      ? '<span class="status st-done">回答ずみ</span>'
+      : '<span class="status st-part">一部だけ回答</span>';
+
+    var head = '<div class="card-head' + (ev.answered ? '' : ' no-border') + '">'
+      + '<h2>' + esc(ev.name) + '</h2>'
+      + ATTEND.metaHtml(ev)
+      + (ev.answered ? '<div>' + pill + '</div>' : '')
+      + '</div>';
+
+    // 未回答は「未回答」とだけ大きく出す（フォームへ強制誘導しない）
+    if (!ev.answered) {
+      return '<div class="card">' + head
+        + '<div class="unanswered">'
+        +   '<div class="word">未回答</div>'
+        +   '<div class="sub">このイベントにはまだ回答していません</div>'
+        + '</div>'
+        + '</div>';
+    }
+
+    var rows = (ev.items || []).map(function (it) {
+      var b = ATTEND.badge(it.answer);
+      return '<div class="row"><div class="name">' + esc(it.name) + '</div>'
+        + '<div class="ansbadge ' + b.cls + '">' + b.txt + '</div></div>';
+    }).join('');
+
+    return '<div class="card">' + head + rows
+      + '<a class="ghost" href="' + esc(formUrl) + '&e=' + encodeURIComponent(ev.id) + '">回答を変更する</a>'
+      + '</div>';
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>出欠を回答する</title>
+<link rel="stylesheet" href="attend.css">
+</head>
+<body>
+
+<header>
+  <h1>出欠の回答</h1>
+  <p id="org"></p>
+</header>
+<div class="me" id="me"></div>
+
+<div class="wrap" id="wrap"></div>
+<p class="foot" id="foot"></p>
+
+<script src="attend.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $wrap = document.getElementById('wrap');
+  var $me   = document.getElementById('me');
+  var $org  = document.getElementById('org');
+  var $foot = document.getElementById('foot');
+
+  var esc = ATTEND.esc;
+  var device = ATTEND.deviceId();
+  var member = null;          // {name, gender}
+  var events = [];            // 表示中のイベント
+  var picks  = {};            // picks[イベントID][種目] = '〇' | '△' | '×'
+
+  $wrap.innerHTML = ATTEND.loadingHtml();
+  if (ATTEND.requireDeployId($wrap)) return;
+
+  $wrap.addEventListener('click', onTap);   // 委譲は1回だけ登録する（再描画しても増やさない）
+  $wrap.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var c = e.target.closest('.choice');
+    if (c) { e.preventDefault(); choose(c); }
+  });
+  load();
+
+  /* ===== 読み込み ===== */
+  function load() {
+    $wrap.innerHTML = ATTEND.loadingHtml();
+    var req = ATTEND.eventId
+      ? ATTEND.get('event', { e: ATTEND.eventId, d: device })
+      : ATTEND.get('', { d: device });
+
+    req.then(function (data) {
+      setOrg(data.org);
+      member = data.member || null;
+      events = ATTEND.eventId ? [data.event] : (data.events || []);
+      if (!member) { showNamePicker(); return; }
+      renderMe();
+      renderEvents();
+    }).catch(fail);
+  }
+
+  function setOrg(org) {
+    if (!org) return;
+    $org.textContent = org;
+    document.title = '出欠を回答する｜' + org;
+  }
+
+  function fail(err) {
+    $wrap.innerHTML = ATTEND.noteHtml('読み込めませんでした', String(err && err.message || err), true);
+    $wrap.insertAdjacentHTML('beforeend',
+      '<button class="ghost" type="button" id="retry">もう一度読み込む</button>');
+    document.getElementById('retry').addEventListener('click', load);
+  }
+
+  /* ===== 初回：名簿から自分の名前を選ぶ ===== */
+  function showNamePicker() {
+    $me.innerHTML = '';
+    $wrap.innerHTML = ATTEND.loadingHtml('名簿を読み込んでいます…');
+
+    ATTEND.get('members').then(function (data) {
+      setOrg(data.org);
+      var members = data.members || [];
+      if (!members.length) {
+        $wrap.innerHTML = ATTEND.noteHtml('名簿がまだ空です',
+          '主催者がスプレッドシートの「名簿」シートに名前を書くと、ここから選べるようになります。', true);
+        return;
+      }
+
+      var html = '<div class="card"><div class="reg">'
+        + '<h2>はじめての方へ</h2>'
+        + '<p class="lead">名簿からあなたのお名前を選んで、「これで登録」を押してください。'
+        + '登録はこの端末で最初の1回だけです。</p>'
+        + '<div class="names" id="names">'
+        + members.map(function (m, i) {
+            return '<div class="nbtn" data-i="' + i + '" role="button" tabindex="0">' + esc(m.name) + '</div>';
+          }).join('')
+        + '</div>'
+        + '<button class="reg-confirm" id="regBtn" type="button" disabled>これで登録</button>'
+        + '<p class="reg-msg" id="regMsg"></p>'
+        + '</div></div>';
+      $wrap.innerHTML = html;
+
+      var $names = document.getElementById('names');
+      var $btn = document.getElementById('regBtn');
+      var chosen = null;
+
+      function pick(el) {
+        if (!el) return;
+        Array.prototype.forEach.call($names.querySelectorAll('.nbtn'), function (x) { x.classList.remove('sel'); });
+        el.classList.add('sel');
+        chosen = members[Number(el.dataset.i)];
+        $btn.disabled = false;
+      }
+      $names.addEventListener('click', function (e) { pick(e.target.closest('.nbtn')); });
+      $names.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e.target.closest('.nbtn')); }
+      });
+
+      $btn.addEventListener('click', function () {
+        if (!chosen) return;
+        var $msg = document.getElementById('regMsg');
+        $btn.disabled = true;
+        $msg.className = 'reg-msg';
+        $msg.textContent = '登録しています…';
+
+        ATTEND.post({ action: 'register', deviceId: device, name: chosen.name })
+          .then(function (res) {
+            member = res.member;
+            load();
+          })
+          .catch(function (err) {
+            $msg.className = 'reg-msg ng';
+            $msg.textContent = String(err && err.message || err);
+            $btn.disabled = false;
+          });
+      });
+    }).catch(fail);
+  }
+
+  function renderMe() {
+    $me.innerHTML = '<span><b>' + esc(member.name) + '</b> さんとして回答します</span>'
+      + '<button type="button" class="relink" id="relink">ちがう人です</button>';
+    document.getElementById('relink').addEventListener('click', function () {
+      member = null;
+      showNamePicker();
+    });
+  }
+
+  /* ===== 回答フォーム ===== */
+  function renderEvents() {
+    if (!events.length || !events[0]) {
+      $wrap.innerHTML = ATTEND.noteHtml('いま受付中のイベントはありません',
+        '新しいイベントが登録されると、ここに表示されます。');
+      return;
+    }
+
+    picks = {};
+    $wrap.innerHTML = events.map(cardHtml).join('');
+    $foot.textContent = ATTEND.eventId ? '' : '※ 申込締切をすぎたイベントは表示されません。';
+
+    events.forEach(function (ev) {
+      picks[ev.id] = {};
+      var mine = ev.mine || {};
+      ev.items.forEach(function (it) { if (mine[it]) picks[ev.id][it] = mine[it]; });
+    });
+  }
+
+  function cardHtml(ev) {
+    var mine = ev.mine || {};
+    var answered = Object.keys(mine).length > 0;
+
+    var head = '<div class="card-head"><h2>' + esc(ev.name) + '</h2>'
+      + ATTEND.metaHtml(ev)
+      + (ev.closed ? '<div><span class="badge closed">申込締切をすぎました</span></div>'
+                   : (answered ? '<div><span class="status st-done">回答ずみ（変更できます）</span></div>' : ''))
+      + '</div>';
+
+    if (ev.closed) {
+      return '<div class="card" data-id="' + esc(ev.id) + '">' + head
+        + ATTEND.noteHtml('', 'このイベントの受付は終わりました。下の結果だけご覧いただけます。')
+        + '<button class="ghost" type="button" data-sum="' + esc(ev.id) + '">みんなの回答を見る</button>'
+        + '<div class="sumbox" id="sum-' + esc(ev.id) + '"></div>'
+        + '</div>';
+    }
+
+    var items = ev.items.map(function (it) {
+      var cur = mine[it] || '';
+      return '<div class="item"><div class="name">' + esc(it) + '</div>'
+        + '<div class="choices" data-id="' + esc(ev.id) + '" data-item="' + esc(it) + '">'
+        + ATTEND.CHOICES.map(function (c) {
+            var on = (cur === c.key) ? ' ' + c.cls : '';
+            return '<div class="choice' + on + '" data-key="' + c.key + '" data-cls="' + c.cls + '" role="button" tabindex="0">'
+              + '<span class="mark">' + c.key + '</span><span class="lab">' + c.lab + '</span></div>';
+          }).join('')
+        + '</div></div>';
+    }).join('');
+
+    return '<div class="card" data-id="' + esc(ev.id) + '">' + head + items
+      + '<button class="submit" type="button" data-send="' + esc(ev.id) + '">'
+      + (answered ? 'この内容で送りなおす' : 'この出欠を送信する') + '</button>'
+      + '<p class="card-msg" id="msg-' + esc(ev.id) + '"></p>'
+      + '<button class="ghost" type="button" data-sum="' + esc(ev.id) + '">みんなの回答を見る</button>'
+      + '<div class="sumbox" id="sum-' + esc(ev.id) + '"></div>'
+      + '</div>';
+  }
+
+  function onTap(e) {
+    var choice = e.target.closest('.choice');
+    if (choice) { choose(choice); return; }
+
+    var send = e.target.closest('[data-send]');
+    if (send) { submit(send.dataset.send); return; }
+
+    var sum = e.target.closest('[data-sum]');
+    if (sum) { showSummary(sum.dataset.sum, sum); return; }
+  }
+
+  function choose(choice) {
+    var grp = choice.closest('.choices');
+    if (!grp || grp.classList.contains('locked')) return;
+    Array.prototype.forEach.call(grp.querySelectorAll('.choice'), function (c) {
+      c.classList.remove('sel-maru', 'sel-sankaku', 'sel-batsu');
+    });
+    choice.classList.add(choice.dataset.cls);
+    picks[grp.dataset.id][grp.dataset.item] = choice.dataset.key;
+  }
+
+  function submit(id) {
+    var ev = events.filter(function (x) { return x.id === id; })[0];
+    if (!ev) return;
+    var $msg = document.getElementById('msg-' + id);
+    var $btn = document.querySelector('[data-send="' + id + '"]');
+    var mine = picks[id] || {};
+
+    var rest = ev.items.filter(function (it) { return !mine[it]; });
+    if (rest.length) {
+      $msg.className = 'card-msg ng';
+      $msg.textContent = 'まだ選んでいない種目があります：' + rest.join('、');
+      return;
+    }
+
+    $btn.disabled = true;
+    $msg.className = 'card-msg';
+    $msg.textContent = '送信しています…';
+
+    ATTEND.post({ action: 'answer', deviceId: device, eventId: id, answers: mine })
+      .then(function (res) {
+        $msg.className = 'card-msg ok';
+        $msg.textContent = '✓ 送信しました。締切前なら何度でも直せます。';
+        ev.mine = res.saved || mine;
+        $btn.textContent = 'この内容で送りなおす';
+        $btn.disabled = false;
+        if (res.summary) paintSummary(id, res.summary);
+      })
+      .catch(function (err) {
+        $msg.className = 'card-msg ng';
+        $msg.textContent = String(err && err.message || err);
+        $btn.disabled = false;
+      });
+  }
+
+  function showSummary(id, btn) {
+    var box = document.getElementById('sum-' + id);
+    if (box.dataset.open === '1') {
+      box.innerHTML = '';
+      box.dataset.open = '';
+      btn.textContent = 'みんなの回答を見る';
+      return;
+    }
+    box.innerHTML = ATTEND.loadingHtml('集計しています…');
+    box.dataset.open = '1';
+    btn.textContent = '結果を閉じる';
+
+    ATTEND.get('summary', { e: id })
+      .then(function (res) { paintSummary(id, res.summary); })
+      .catch(function (err) {
+        box.innerHTML = ATTEND.noteHtml('', String(err && err.message || err), true);
+      });
+  }
+
+  function paintSummary(id, sum) {
+    var box = document.getElementById('sum-' + id);
+    if (!box) return;
+    box.innerHTML = ATTEND.summaryHtml(sum)
+      + '<p class="unknown" style="padding:0 16px 14px">※ 人数のみ表示しています（どなたが回答したかは表示されません）。</p>';
+    box.dataset.open = '1';
+    var btn = document.querySelector('[data-sum="' + id + '"]');
+    if (btn) btn.textContent = '結果を閉じる';
+  }
+})();
+</script>
+</body>
+</html>

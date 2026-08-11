@@ -1,0 +1,660 @@
+/**
+ * 出欠ドロッパー — attendance-api.gs  v1.0
+ * 主催者のスプレッドシートに同梱するコンテナバインドスクリプト（API本体）。
+ *
+ * デプロイ設定：
+ *   デプロイ → 新しいデプロイ → 種類：ウェブアプリ
+ *   実行するユーザー：自分 ／ アクセスできるユーザー：全員
+ *
+ * ★再デプロイの鉄則
+ *   デプロイ → デプロイを管理 → 鉛筆 → バージョン「新しいバージョン」→ デプロイ
+ *   （URLは変わりません。「新しいデプロイ」を連発するとURLが増えて詰まります）
+ *
+ * ※ このファイルでのみグローバル定数を宣言します。
+ *   tally.gs 側で再宣言すると SyntaxError になるので絶対に書かないこと。
+ */
+
+var API_VERSION = 'v1.0';
+
+var SH = {
+  CONFIG:  '設定',
+  MEMBERS: '名簿',
+  EVENTS:  'イベント',
+  ANSWERS: '回答',
+  LINKS:   '紐付け',
+  TALLY:   '集計'
+};
+
+var DEFAULT_TZ = 'Asia/Tokyo';
+var WDAY = ['日', '月', '火', '水', '木', '金', '土'];
+var MARKS = ['〇', '△', '×'];
+
+
+/* ============================================================
+ *  Web API
+ * ========================================================== */
+
+function doGet(e) {
+  try {
+    var p = (e && e.parameter) || {};
+    var action = String(p.action || '').trim();
+
+    switch (action) {
+      case '':
+      case 'events':    return json_(listEvents_(p.d));
+      case 'event':     return json_(getEvent_(p.e, p.d));
+      case 'members':   return json_({ ok: true, org: cfg_().org, members: members_(false) });
+      case 'whoami':    return json_(whoami_(p.d));
+      case 'summary':   return json_(summaryAction_(p.e));
+      case 'myanswers': return json_(myAnswers_(p.d));
+      case 'ping':      return json_({ ok: true, org: cfg_().org, version: API_VERSION });
+      default:          return json_({ ok: false, error: '不明な action です：' + action });
+    }
+  } catch (err) {
+    return json_({ ok: false, error: errMsg_(err) });
+  }
+}
+
+function doPost(e) {
+  try {
+    var b = body_(e);
+    var action = String(b.action || (e && e.parameter && e.parameter.action) || '').trim();
+
+    switch (action) {
+      case 'register':    return json_(register_(b));
+      case 'answer':      return json_(answer_(b));
+      case 'createEvent': return json_(createEvent_(b));
+      case 'checkKey':    return json_(checkKey_(b));
+      default:            return json_({ ok: false, error: '不明な action です：' + action });
+    }
+  } catch (err) {
+    return json_({ ok: false, error: errMsg_(err) });
+  }
+}
+
+
+/* ============================================================
+ *  読み取り系
+ * ========================================================== */
+
+/** 締切前のイベント一覧（開催日の早い順）。d=端末IDがあれば自分の回答も添える */
+function listEvents_(deviceId) {
+  var c = cfg_();
+  var me = linkOf_(deviceId);
+  var mine = me ? latestAnswersOf_(me.name) : {};
+  var list = eventRows_()
+    .filter(function (ev) { return !ev.closed; })
+    .sort(function (a, b) { return a.sortKey - b.sortKey; })
+    .map(function (ev) { return publicEvent_(ev, mine[ev.id] || null); });
+
+  return { ok: true, org: c.org, member: me, events: list };
+}
+
+/** イベント1件の詳細。締切後でも返す（フォーム側で締切表示にする） */
+function getEvent_(eventId, deviceId) {
+  var c = cfg_();
+  var ev = findEvent_(eventId);
+  if (!ev) return { ok: false, error: 'イベントが見つかりません。主催者からもらったリンクをもう一度お確かめください。', notFound: true };
+
+  var me = linkOf_(deviceId);
+  var mine = me ? (latestAnswersOf_(me.name)[ev.id] || null) : null;
+  return { ok: true, org: c.org, member: me, event: publicEvent_(ev, mine) };
+}
+
+/** 端末IDから登録済みの本人を返す */
+function whoami_(deviceId) {
+  var me = linkOf_(deviceId);
+  return { ok: true, org: cfg_().org, registered: !!me, member: me };
+}
+
+/** e があればそのイベント1件、なければ全イベントの集計（人数のみ・個人名なし） */
+function summaryAction_(eventId) {
+  var c = cfg_();
+  var evs;
+
+  if (String(eventId || '').trim()) {
+    var ev = findEvent_(eventId);
+    if (!ev) return { ok: false, error: 'イベントが見つかりません。', notFound: true };
+    evs = [ev];
+  } else {
+    evs = eventRows_().sort(function (a, b) { return b.sortKey - a.sortKey; }).slice(0, 50);
+  }
+
+  var latest = latestByEvent_();
+  var genders = genderMap_();
+  var list = evs.map(function (ev) { return summaryOf_(ev, latest[ev.id] || {}, genders); });
+
+  return { ok: true, org: c.org, summaries: list, summary: list[0] || null };
+}
+
+/** 締切前の各イベントについて、その端末の最新回答 */
+function myAnswers_(deviceId) {
+  var c = cfg_();
+  var me = linkOf_(deviceId);
+  var mine = me ? latestAnswersOf_(me.name) : {};
+
+  var list = eventRows_()
+    .filter(function (ev) { return !ev.closed; })
+    .sort(function (a, b) { return a.sortKey - b.sortKey; })
+    .map(function (ev) {
+      var ans = mine[ev.id] || null;
+      var items = ev.items.map(function (it) {
+        return { name: it, answer: (ans && ans[it]) || '' };
+      });
+      var done = items.filter(function (x) { return !!x.answer; }).length;
+      return {
+        id: ev.id,
+        name: ev.name,
+        date: ev.date,
+        deadline: ev.deadline,
+        youkou: ev.youkou,
+        items: items,
+        answered: done > 0,
+        allAnswered: done > 0 && done === items.length
+      };
+    });
+
+  return { ok: true, org: c.org, member: me, registered: !!me, myanswers: list };
+}
+
+
+/* ============================================================
+ *  書き込み系
+ * ========================================================== */
+
+/** 名簿の名前を選んで端末を紐付ける */
+function register_(b) {
+  var deviceId = String(b.deviceId || '').trim();
+  var name = String(b.name || '').trim();
+
+  if (!deviceId) return { ok: false, error: '端末IDがありません。ブラウザを更新してからもう一度お試しください。' };
+  if (!name)     return { ok: false, error: 'お名前が選ばれていません。' };
+
+  var mem = null;
+  members_(false).forEach(function (m) {
+    if (normKey_(m.name) === normKey_(name)) mem = m;
+  });
+  if (!mem) return { ok: false, error: '名簿にないお名前です。主催者にご確認ください。', notInRoster: true };
+
+  withLock_(function () {
+    sheet_(SH.LINKS).appendRow([deviceId, mem.name, mem.gender, new Date()]);
+  });
+
+  return { ok: true, member: { name: mem.name, gender: mem.gender } };
+}
+
+/** 回答を1行追記する（上書きせず追記。集計は最新行を採用） */
+function answer_(b) {
+  var deviceId = String(b.deviceId || '').trim();
+  var eventId = String(b.eventId || '').trim();
+  var answers = b.answers || {};
+
+  var me = linkOf_(deviceId);
+  if (!me) return { ok: false, error: '先にお名前の登録が必要です。', needRegister: true };
+
+  var ev = findEvent_(eventId);
+  if (!ev) return { ok: false, error: 'イベントが見つかりません。', notFound: true };
+  if (ev.closed) return { ok: false, error: 'このイベントは申込締切をすぎています。', closed: true };
+
+  var clean = {};
+  var n = 0;
+  ev.items.forEach(function (it) {
+    var m = normMark_(answers[it]);
+    if (m) { clean[it] = m; n++; }
+  });
+  if (!n) return { ok: false, error: '回答が選ばれていません。' };
+
+  withLock_(function () {
+    sheet_(SH.ANSWERS).appendRow([new Date(), deviceId, me.name, ev.id, JSON.stringify(clean)]);
+  });
+
+  var latest = latestByEvent_();
+  return {
+    ok: true,
+    saved: clean,
+    member: me,
+    summary: summaryOf_(ev, latest[ev.id] || {}, genderMap_())
+  };
+}
+
+/** カレンダードロッパーからイベントを作る。書き込みキー必須 */
+function createEvent_(b) {
+  var c = cfg_();
+  if (!c.key) return { ok: false, error: '書き込みキーが未設定です（設定シートのB2）。', badKey: true };
+  if (String(b.key || '').trim() !== c.key) return { ok: false, error: '書き込みキーが違います。', badKey: true };
+
+  var name = String(b.name || '').trim();
+  if (!name) return { ok: false, error: 'イベント名がありません。' };
+
+  var items = Array.isArray(b.items)
+    ? b.items.map(function (s) { return String(s).trim(); }).filter(String)
+    : splitItems_(b.items);
+  if (!items.length) items = ['参加'];
+
+  var dateV = toDate_(b.date);
+  var deadV = toDate_(b.deadline);
+  var youkou = normUrl_(b.youkou);
+
+  var out = null;
+  withLock_(function () {
+    // 二重ドロップ対策：同じ名前・同じ開催日の行があれば作り直さない
+    var dup = null;
+    eventRows_().forEach(function (ev) {
+      if (normKey_(ev.name) === normKey_(name) && sameDay_(ev.dateRaw, dateV)) dup = ev;
+    });
+    if (dup) { out = { ok: true, eventId: dup.id, org: c.org, existing: true }; return; }
+
+    var id = newEventId_();
+    sheet_(SH.EVENTS).appendRow([
+      id, name,
+      dateV || String(b.date || '').trim(),
+      deadV || String(b.deadline || '').trim(),
+      items.join('、'), youkou, new Date()
+    ]);
+    out = { ok: true, eventId: id, org: c.org, existing: false };
+  });
+
+  return out;
+}
+
+/** セットアップウィザードの書き込みキー確認 */
+function checkKey_(b) {
+  var c = cfg_();
+  return { ok: true, org: c.org, version: API_VERSION, keyOk: !!c.key && String(b.key || '').trim() === c.key };
+}
+
+
+/* ============================================================
+ *  集計ロジック（tally.gs からも使う）
+ * ========================================================== */
+
+/** 回答シートを1回だけ走査して {イベントID: {名前キー: {name, ans}}} を作る（latest-row-wins） */
+function latestByEvent_() {
+  var out = {};
+  rows_(SH.ANSWERS).forEach(function (r) {
+    var evId = String(r[3] || '').trim();
+    var name = String(r[2] || '').trim();
+    if (!evId || !name) return;
+    if (!out[evId]) out[evId] = {};
+    out[evId][normKey_(name)] = { name: name, ans: parseAnswers_(r[4]) };
+  });
+  return out;
+}
+
+/** ある人の全イベントの最新回答 {イベントID: {種目: 〇}} */
+function latestAnswersOf_(name) {
+  var key = normKey_(name);
+  var out = {};
+  rows_(SH.ANSWERS).forEach(function (r) {
+    if (normKey_(r[2]) !== key) return;
+    var evId = String(r[3] || '').trim();
+    if (!evId) return;
+    out[evId] = parseAnswers_(r[4]);
+  });
+  return out;
+}
+
+/** 名前キー → 性別 */
+function genderMap_() {
+  var map = {};
+  members_(true).forEach(function (m) { map[normKey_(m.name)] = m.gender; });
+  rows_(SH.LINKS).forEach(function (r) {
+    var k = normKey_(r[1]);
+    if (k && !map[k]) map[k] = normGender_(r[2]);
+  });
+  return map;
+}
+
+/**
+ * イベント1件の集計。人数のみ・個人名は含めない。
+ * items[].maru / sankaku / batsu = {m:男, f:女, u:性別未登録}
+ */
+function summaryOf_(ev, answersByName, genders) {
+  var names = Object.keys(answersByName || {});
+  var items = ev.items.map(function (it) {
+    var cell = { name: it, maru: zero_(), sankaku: zero_(), batsu: zero_() };
+    names.forEach(function (k) {
+      var mark = normMark_(answersByName[k].ans[it]);
+      if (!mark) return;
+      var bucket = mark === '〇' ? cell.maru : (mark === '△' ? cell.sankaku : cell.batsu);
+      var g = genders[k] || '';
+      if (g === '男') bucket.m++;
+      else if (g === '女') bucket.f++;
+      else bucket.u++;
+    });
+    return cell;
+  });
+
+  return {
+    id: ev.id,
+    name: ev.name,
+    date: ev.date,
+    deadline: ev.deadline,
+    youkou: ev.youkou,
+    closed: ev.closed,
+    respCount: names.length,
+    items: items
+  };
+}
+
+/** 未回答者の名前（主催者向け。集計シートにだけ書く） */
+function pendingNames_(answersByName) {
+  var answered = answersByName || {};
+  return members_(false)
+    .filter(function (m) { return !answered[normKey_(m.name)]; })
+    .map(function (m) { return m.name; });
+}
+
+function zero_() { return { m: 0, f: 0, u: 0 }; }
+
+
+/* ============================================================
+ *  シート読み取りの下ごしらえ
+ * ========================================================== */
+
+function ss_() { return SpreadsheetApp.getActive(); }
+
+function sheet_(name) {
+  var sh = ss_().getSheetByName(name);
+  if (!sh) throw new Error('シート「' + name + '」がありません。メニュー「出欠システム → 初期設定」を実行してください。');
+  return sh;
+}
+
+/** ヘッダ行を除いた値の2次元配列 */
+function rows_(name) {
+  var sh = sheet_(name);
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return [];
+  return sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+}
+
+function cfg_() {
+  var v = sheet_(SH.CONFIG).getRange(1, 2, 3, 1).getValues();
+  return {
+    org: String(v[0][0] || '').trim() || '出欠',
+    key: String(v[1][0] || '').trim(),
+    tz:  String(v[2][0] || '').trim() || DEFAULT_TZ
+  };
+}
+
+/** 名簿。includeRetired が false なら備考に「退会」等がある人を除く */
+function members_(includeRetired) {
+  var list = [];
+  rows_(SH.MEMBERS).forEach(function (r) {
+    var name = String(r[0] || '').trim();
+    if (!name) return;
+    var note = String(r[2] || '').trim();
+    var retired = /退会|退部|休会|除外/.test(note);
+    if (!includeRetired && retired) return;
+    list.push({ name: name, gender: normGender_(r[1]), retired: retired });
+  });
+  return list;
+}
+
+function eventRows_() {
+  var tz = cfg_().tz;
+  var list = [];
+  rows_(SH.EVENTS).forEach(function (r, i) {
+    var id = String(r[0] || '').trim();
+    if (!id) return;
+    list.push({
+      row: i + 2,
+      id: id,
+      name: String(r[1] || '').trim(),
+      dateRaw: r[2],
+      date: fmtDate_(r[2], tz),
+      deadlineRaw: r[3],
+      deadline: fmtDate_(r[3], tz),
+      items: splitItems_(r[4]),
+      youkou: normUrl_(r[5]),
+      closed: isClosed_(r[3], r[2]),
+      sortKey: (toDate_(r[2]) || toDate_(r[3]) || new Date(0)).getTime()
+    });
+  });
+  return list;
+}
+
+function findEvent_(eventId) {
+  var key = String(eventId || '').trim();
+  if (!key) return null;
+  var found = null;
+  eventRows_().forEach(function (ev) { if (ev.id === key) found = ev; });
+  return found;
+}
+
+function publicEvent_(ev, mine) {
+  return {
+    id: ev.id, name: ev.name, date: ev.date, deadline: ev.deadline,
+    items: ev.items, youkou: ev.youkou, closed: ev.closed, mine: mine || null
+  };
+}
+
+/** 紐付けシートの最新行を採用。性別は名簿から引き直す */
+function linkOf_(deviceId) {
+  var key = normKey_(deviceId);
+  if (!key) return null;
+
+  var found = null;
+  rows_(SH.LINKS).forEach(function (r) {
+    if (normKey_(r[0]) !== key) return;
+    var name = String(r[1] || '').trim();
+    if (name) found = { name: name, gender: normGender_(r[2]) };
+  });
+  if (!found) return null;
+
+  members_(true).forEach(function (m) {
+    if (normKey_(m.name) === normKey_(found.name)) {
+      found.name = m.name;
+      found.gender = m.gender;
+    }
+  });
+  return found;
+}
+
+function newEventId_() {
+  var used = {};
+  eventRows_().forEach(function (ev) { used[ev.id] = true; });
+  for (var i = 0; i < 50; i++) {
+    var id = 'ev' + (Date.now() + i).toString(36);
+    if (!used[id]) return id;
+  }
+  return 'ev' + Utilities.getUuid().replace(/-/g, '').slice(0, 10);
+}
+
+
+/* ============================================================
+ *  小物
+ * ========================================================== */
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/** POST本体。CORSプリフライト回避のため text/plain のJSON文字列で受ける */
+function body_(e) {
+  if (e && e.postData && e.postData.contents) {
+    try { return JSON.parse(e.postData.contents); } catch (err) { /* fall through */ }
+  }
+  return (e && e.parameter) || {};
+}
+
+function withLock_(fn) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { return fn(); } finally { lock.releaseLock(); }
+}
+
+/** 全角半角・空白・大小文字を吸収した突き合わせ用キー */
+function normKey_(s) {
+  var t = String(s == null ? '' : s);
+  if (t.normalize) t = t.normalize('NFKC');
+  return t.replace(/[\s　]+/g, '').toLowerCase();
+}
+
+function normGender_(v) {
+  var s = normKey_(v);
+  if (!s) return '';
+  if (/^(男|男性|m|male|おとこ)$/.test(s)) return '男';
+  if (/^(女|女性|f|female|おんな)$/.test(s)) return '女';
+  return '';
+}
+
+function normMark_(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (/^[〇○◯oO０0]$/.test(s)) return '〇';
+  if (/^[△▲sS]$/.test(s)) return '△';
+  if (/^[×✕✖ｘxX]$/.test(s)) return '×';
+  return '';
+}
+
+function parseAnswers_(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return {};
+  try {
+    var o = JSON.parse(s);
+    return (o && typeof o === 'object') ? o : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function splitItems_(v) {
+  return String(v == null ? '' : v)
+    .split(/[、,，\n\/／]+/)
+    .map(function (s) { return s.trim(); })
+    .filter(String);
+}
+
+function normUrl_(v) {
+  var s = String(v == null ? '' : v).trim();
+  return /^https?:\/\//i.test(s) ? s : '';
+}
+
+function toDate_(v) {
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return null;
+  var m = s.match(/(\d{4})\D{1,3}(\d{1,2})\D{1,3}(\d{1,2})/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function fmtDate_(v, tz) {
+  var d = toDate_(v);
+  if (!d) return String(v == null ? '' : v).trim();
+  var zone = tz || DEFAULT_TZ;
+  var u = Number(Utilities.formatDate(d, zone, 'u')) % 7;   // 1=月 … 7=日 → 0=日
+  return Utilities.formatDate(d, zone, 'yyyy/MM/dd') + '（' + WDAY[u] + '）';
+}
+
+function sameDay_(a, b) {
+  var x = toDate_(a), y = toDate_(b);
+  if (!x || !y) return !x && !y;
+  return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+
+/** 申込締切（なければ開催日）の当日23:59:59をすぎたら締切後 */
+function isClosed_(deadline, eventDate) {
+  var d = toDate_(deadline) || toDate_(eventDate);
+  if (!d) return false;
+  var end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+  return Date.now() > end.getTime();
+}
+
+function errMsg_(err) {
+  return String((err && err.message) ? err.message : err);
+}
+
+
+/* ============================================================
+ *  初期設定（スプレッドシートのメニューから実行）
+ * ========================================================== */
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('出欠システム')
+    .addItem('初期設定（シートを作る）', '初期設定')
+    .addItem('集計を更新', 'shukei')
+    .addSeparator()
+    .addItem('書き込みキーを表示', '書き込みキーを表示')
+    .addItem('書き込みキーを作り直す', '書き込みキーを作り直す')
+    .addToUi();
+}
+
+/** 足りないシートを作り、見出しと書き込みキーを用意する。何度実行しても安全 */
+function 初期設定() {
+  var ss = ss_();
+  var made = [];
+
+  function ensure(name, headers, widths) {
+    var sh = ss.getSheetByName(name);
+    if (!sh) { sh = ss.insertSheet(name); made.push(name); }
+    if (headers && headers.length) {
+      sh.getRange(1, 1, 1, headers.length).setValues([headers])
+        .setFontWeight('bold').setBackground('#eef3f7');
+      sh.setFrozenRows(1);
+      if (widths) widths.forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+    }
+    return sh;
+  }
+
+  // 設定シートだけは見出しが縦なので別あつかい
+  var conf = ss.getSheetByName(SH.CONFIG);
+  if (!conf) { conf = ss.insertSheet(SH.CONFIG, 0); made.push(SH.CONFIG); }
+  var labels = [['団体名'], ['書き込みキー'], ['タイムゾーン']];
+  conf.getRange(1, 1, 3, 1).setValues(labels).setFontWeight('bold');
+  conf.setColumnWidth(1, 140);
+  conf.setColumnWidth(2, 380);
+  if (!String(conf.getRange('B1').getValue() || '').trim()) conf.getRange('B1').setValue('わたしたちの団体');
+  if (!String(conf.getRange('B2').getValue() || '').trim()) conf.getRange('B2').setValue(newWriteKey_());
+  if (!String(conf.getRange('B3').getValue() || '').trim()) conf.getRange('B3').setValue(DEFAULT_TZ);
+  conf.getRange(1, 3, 3, 1).setValues([
+    ['出欠ページのヘッダに表示されます'],
+    ['カレンダードロッパーに登録するキー。人には見せないでください'],
+    ['ふつうは Asia/Tokyo のままで大丈夫です']
+  ]).setFontColor('#5a6b7b');
+
+  ensure(SH.MEMBERS, ['名前', '性別（男／女）', '備考'], [160, 130, 240]);
+  ensure(SH.EVENTS,  ['イベントID', 'イベント名', '開催日', '申込締切', '種目（、区切り）', '要項リンク', '登録日時'],
+                     [110, 280, 120, 120, 240, 260, 160]);
+  ensure(SH.ANSWERS, ['タイムスタンプ', '端末ID', '名前', 'イベントID', '回答JSON'],
+                     [160, 300, 140, 110, 320]);
+  ensure(SH.LINKS,   ['端末ID', '名前', '性別', '登録日時'], [300, 140, 80, 160]);
+  ensure(SH.TALLY,   [], []);
+
+  SpreadsheetApp.getUi().alert(
+    '初期設定が終わりました。\n\n' +
+    (made.length ? '作ったシート：' + made.join('、') + '\n\n' : '') +
+    '次にやること\n' +
+    '1. 「設定」シートのB1に団体名を入れる\n' +
+    '2. 「名簿」シートにメンバーの名前と性別を書く\n' +
+    '3. デプロイ → 新しいデプロイ → ウェブアプリ（実行：自分／アクセス：全員）'
+  );
+}
+
+function 書き込みキーを表示() {
+  var key = cfg_().key || '（未設定です。初期設定を実行してください）';
+  SpreadsheetApp.getUi().alert('書き込みキー\n\n' + key + '\n\nカレンダードロッパーの設定欄に貼り付けてください。人には見せないでください。');
+}
+
+function 書き込みキーを作り直す() {
+  var ui = SpreadsheetApp.getUi();
+  var res = ui.alert('書き込みキーを作り直しますか？', '作り直すと、いま登録してあるカレンダードロッパーからイベントを作れなくなります。新しいキーを登録しなおしてください。', ui.ButtonSet.YES_NO);
+  if (res !== ui.Button.YES) return;
+  var key = newWriteKey_();
+  sheet_(SH.CONFIG).getRange('B2').setValue(key);
+  ui.alert('新しい書き込みキー\n\n' + key);
+}
+
+function newWriteKey_() {
+  var chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var raw = Utilities.getUuid() + Utilities.getUuid();
+  var out = '';
+  for (var i = 0; i < 32; i++) {
+    out += chars.charAt(raw.charCodeAt(i * 2) % chars.length);
+  }
+  return out;
+}
