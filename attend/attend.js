@@ -13,7 +13,7 @@ var ATTEND = (function () {
 
   var DEVICE_KEY = 'attend.deviceId';
   var STORE = {
-    deployId: 'dropper.attend.deployId',   // カレンダードロッパーと共有する
+    deployId: 'dropper.attend.deployId',   // イベントドロッパーと共有する
     writeKey: 'dropper.attend.writeKey',
     org:      'dropper.attend.org'
   };

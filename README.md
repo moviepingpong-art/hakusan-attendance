@@ -13,7 +13,7 @@
 
 ### 考え方
 
-**リンク方式。** カレンダードロッパーの案内文に「🙋 出欠を回答する」リンクを1本足すだけ。
+**リンク方式。** イベントドロッパーの案内文に「🙋 出欠を回答する」リンクを1本足すだけ。
 配信は各団体がすでに持っている LINEグループ・LINE公式アカウント・メール等に任せる。
 このツール自体は **LIFF も LINEログイン も Messaging API も使わない**。
 
@@ -25,7 +25,7 @@
 ```
 [主催者] 要項PDF
    ↓ ドロップ
-[カレンダードロッパー]（別リポジトリ dropper-app）
+[イベントドロッパー]（別リポジトリ dropper-app）
    ├→ Googleカレンダーに登録
    ├→「出欠を作る」→ 主催者のGAS → イベント行を追加 → eventId
    └→ 案内文に「🙋 出欠を回答する」リンクを同梱
@@ -46,7 +46,7 @@
 | `attend/attend.js` `attend/attend.css` | 共通ロジック・共通スタイル | — |
 | `gas/attendance-api.gs` | GAS本体（doGet / doPost 全action、初期設定メニュー） | 主催者のシートに同梱 |
 | `gas/tally.gs` | `shukei()`。男女別6列＋未回答者名 | 同上 |
-| `dropper/attendance-hook.js` | カレンダードロッパーに貼り込む連携モジュール | dropper-app へコピー |
+| `dropper/attendance-hook.js` | イベントドロッパーに貼り込む連携モジュール | dropper-app へコピー |
 
 ### URL
 
@@ -64,7 +64,7 @@ LINEがリンク化できない長さ（実測：237字は可・453字は不可�
 ### ドキュメント
 
 - [セットアップ手順・データ構造・API仕様](docs/setup-guide.md)
-- [カレンダードロッパー側の改修](docs/dropper-integration.md)
+- [イベントドロッパー側の改修](docs/dropper-integration.md)
 - [白山クラブの移行手順](docs/migration-hakusan.md)
 
 ### 使う前に設定するところ

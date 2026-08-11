@@ -1,170 +1,109 @@
-# カレンダードロッパー側の改修（Phase 5）
+# イベントドロッパー側の連携（Phase 5・実装済み）
 
-改修対象は **別リポジトリ `dropper-app`** です。このリポジトリには、そこへ貼り込むための
-モジュール [`dropper/attendance-hook.js`](../dropper/attendance-hook.js) と、この手順書だけを置いてあります。
-
-対象ファイル：`calendar/app.js`（日本語版）／`calendar/index.html`（CSS・DOM）／`i18n.js`（jaキー）
-**`parser.js` は変更しない。**
+**実装先は別リポジトリ `moviepingpong-art/dropper-app`。** このリポジトリには連携モジュールの原本
+[`dropper/attendance-hook.js`](../dropper/attendance-hook.js) と、この記録を置いてある。
+`dropper-app` 側の変更はブランチ `claude/generic-attendance-system-r33wsi` に入っている。
 
 ---
 
-## 0. 置き場所
+## dropper-app に入れたもの
 
 ```
 dropper-app/
-  attend/                    ← このリポジトリの attend/ をそのままコピー
-    index.html  my.html  status.html  setup.html  attend.js  attend.css
-  calendar/
-    attendance-hook.js       ← このリポジトリの dropper/attendance-hook.js をコピー
-    app.js  index.html  parser.js  i18n.js
+  attend/                        ← このリポジトリの attend/ をそのままコピー
+  calendar/attendance-hook.js    ← dropper/attendance-hook.js をコピー（3言語ぶん）
+  calendar/app.js                ← 出欠連携を追加、旧クラブモードを撤去
+  calendar/i18n.js               ← attend* / annAttend キーを ja/en/in に追加
+  calendar/index.html            ← 設定モーダル＋CSS＋script タグ
+  （calendar-en / calendar-in も同じ。app.js と i18n.js はバイト単位で同一）
 ```
 
-`attendance-hook.js` の先頭にある `ATTEND_BASE` を公開URLに合わせる。
-
-```js
-var ATTEND_BASE = 'https://app.dropper-tools.com/attend/';
-```
-
-`calendar/index.html` の `app.js` より **前** に読み込む。
-
-```html
-<script src="attendance-hook.js"></script>
-<script src="app.js"></script>
-```
-
-`attend/setup.html` と `calendar/` が同じオリジンにあることが前提です（localStorage を共有して
-書き込みキーを受け渡すため）。別オリジンに置く場合は、ドロッパーの設定欄にキーを手で貼ってもらう。
+`attendance-hook.js` 冒頭の `ATTEND_BASE` が公開URL（`https://app.dropper-tools.com/attend/`）。
+`attend/` の置き場所を変えたらここも変える。
 
 ---
 
-## 追加① 設定欄
+## 画面の流れ
 
-ドロッパーの設定パネルに、1回だけ登録する欄を足す。値は `AttendanceHook` が localStorage に持つ。
+カードの「AIで検算」と「案内文を作る」のあいだに1行足してある。
 
-```html
-<div class="setting-group">
-  <label>出欠システムのURL（…/exec）</label>
-  <input type="url" id="attendUrl" placeholder="https://script.google.com/macros/s/.../exec">
-  <label>書き込みキー</label>
-  <input type="password" id="attendKey">
-  <button type="button" id="attendSave">保存して確認</button>
-  <p id="attendMsg"></p>
-  <p class="hint">まだ用意していない方は <a href="../attend/setup.html" target="_blank">セットアップ手順</a> から。</p>
-</div>
-```
+| 状態 | 表示 | 押すと |
+|---|---|---|
+| 未設定 | `🙋 出欠の回答フォームを付ける` | 設定モーダルが開く |
+| 設定ずみ | `🙋 出欠を作る` ＋ ⚙ | 出欠イベントを1件作る |
+| 作成ずみ | `✓ 出欠を作りました`（押せない） | — |
 
-```js
-document.getElementById('attendSave').addEventListener('click', function () {
-  var msg = document.getElementById('attendMsg');
-  msg.textContent = '確認しています…';
-  AttendanceHook.saveSettings({
-    deployId: document.getElementById('attendUrl').value,
-    writeKey: document.getElementById('attendKey').value
-  }).then(function (res) {
-    msg.textContent = '✓ つながりました：' + res.org;
-    refreshAttendUi();          // ↓ 追加②のボタン表示を切り替える
-  }).catch(function (e) {
-    msg.textContent = String(e.message || e);
-  });
-});
-```
+設定モーダル（`#attend-modal`）は APIキー入力モーダルと同じ作り。
+`…/exec` のURLと書き込みキーを入れて「保存して確認」を押すと、**`checkKey` で両方を確かめてから**
+localStorage に保存する。確認が通らないものは保存しない。
+「まだ用意していない方へ」から `attend/setup.html` に飛べる。
 
-**未設定なら以降の機能は非表示。** `AttendanceHook.configured()` で判定する。
+作成に失敗したときは**ボタンを押せる状態に戻す**。要項を入れ直させない（再ドロップはカレンダー予定が重複する）。
 
 ---
 
-## 追加② 「出欠を作る」ボタン
+## 案内文への同梱
 
-カレンダー登録ボタンの隣に置く。押すと `createEvent` を投げ、返った `eventId` を保持する。
+`buildAnnouncementBody_` の3チャネルすべてに入る。位置は**カレンダー追加リンクの上**
+（回答には締切があり、先に見てほしいのはこちら）。
 
-```js
-var attendEventId = null;      // ドロップ1件につき1つ。再ドロップでリセットされる
-
-function refreshAttendUi() {
-  document.getElementById('attendCreate').hidden = !AttendanceHook.configured();
-}
-
-document.getElementById('attendCreate').addEventListener('click', function () {
-  var btn = this;
-  var msg = document.getElementById('attendCreateMsg');
-  btn.disabled = true;
-  msg.textContent = '出欠を作っています…';
-
-  AttendanceHook.createEvent({
-    name:     extracted.taikaimei,      // 抽出ずみの値をそのまま渡す
-    date:     extracted.kaisaibi,
-    deadline: extracted.shimekiri,
-    items:    extracted.shumoku,        // 配列でも「、」区切りの文字列でもよい
-    youkou:   extracted.youkouUrl || ''
-  }).then(function (res) {
-    attendEventId = res.eventId;
-    msg.textContent = res.existing
-      ? '✓ すでに作られていた出欠を使います'
-      : '✓ 出欠を作りました';
-    btn.textContent = '出欠は作成ずみ';
-    rebuildAnnouncements();             // 追加③：案内文を作り直す
-  }).catch(function (e) {
-    msg.textContent = String(e.message || e);
-    btn.disabled = false;               // ★同じ画面で押しなおせるようにする
-  });
-});
+```
+LINE ： 🙋 出欠を回答する ▶ https://app.dropper-tools.com/attend/?s=…&e=…
+X　　： 同上（ただしカレンダー追加リンクを落とす）
+汎用 ： ▼ 出欠を回答する
+        https://app.dropper-tools.com/attend/?s=…&e=…
 ```
 
-- **失敗しても要項を再ドロップさせない。** 再ドロップはカレンダー予定が重複する原因になる。
-  ボタンを押しなおすだけで復帰できる状態に必ず戻すこと。
-- 同じ大会名・同じ開催日の行がすでにあるときは、GAS 側が新しく作らずに元のIDを
-  `existing: true` で返す。二重押しでイベントが増えることはない。
+- 行の形は**ドロッパー既存のリンク行（地図・カレンダー）に合わせた**。引き継ぎ資料の指定は
+  「🙋 出欠を回答する」＋改行＋URLの2行だったが、同じ案内文の中で書式が割れるのを避けた。
+  2行にしたい場合は `app.js` の `'🙋 ' + I18N.t('annAttend') + ' ▶ ' + attend` を
+  `'🙋 ' + I18N.t('annAttend') + '\n' + attend` に変えるだけ。
+- **X タブは出欠リンクを優先し、カレンダー追加リンクを落とす。** URLを2本入れると本文が押し出されるため。
+- **`add/` の中継（`annRedirect_`）は通していない。** 出欠URLに `%` が無いので、通すと
+  二重エンコードの元を増やすだけになる。
+- 画像書き出し（`annStripUrls_`）はURL行を落とすので、出欠リンクも画像には入らない。
+  画像内のURLはタップできないため、これが正しい挙動。
 
 ---
 
-## 追加③ 案内文への同梱
+## 撤去したもの（旧クラブモード）
 
-出欠を作成ずみのときだけ、案内文（LINE／X／汎用の全タブ）に2行足す。
+`?club=hakusan` の CLUB_MODE と、それに紐づく大会マスタ・シート書き出しを**全部消した**。
 
-```
-🙋 出欠を回答する
-https://app.dropper-tools.com/attend/?s=…&e=…
-```
+- `CLUB_MODE` / `MASTER_SHEET_TITLE` / `CLUB_EXTRA_SCOPES`（`spreadsheets`）
+- `ensureMasterSheet_` / `appendMasterRow_` / `masterRowFromFields_` / `MASTER_HEADERS`
+- カードの「出欠フォームに載せる（大会マスタへ書き出し）」チェックと `masterOptIn`
+- `doRegister` のマスタ追記・再試行まわり、種目空チェック（②-2）
+- i18n の `msgEventEmptyA` / `msgEventEmptyB`
 
-`buildAnnouncement_` 系の、カレンダーリンク・地図リンク・クレジット行と並ぶ位置に差し込む。
+**OAuthスコープは減った（`spreadsheets` が消えた）だけで、増えていない。** 承認済みの3スコープはそのまま。
+出欠システムとの通信は主催者のGASが相手で、Googleの権限を使わない。
 
-```js
-var attendLine = attendEventId ? AttendanceHook.announcementLine(attendEventId) : '';
-// …
-if (attendLine) lines.push(attendLine);
-```
+**残して流用したもの**：種目・締切・開催日の整形（`attendEvents_` ← `masterEvents_`、
+`attendDeadline_`、`attendEventDate_`）。実チラシで詰めた判定なので作り直していない。
+`NON_EVENT_RE` が「予選リーグ」「決勝トーナメント」等の競技方法を種目候補から弾く。
 
-守ること：
-
-- **既存の `annRedirect_`（`add/` 中継ページ）は通さない。**
-  出欠URLに `%` が含まれないので、中継すると二重エンコードの問題を持ち込むだけ。
-- **X タブは字数の都合で出欠リンクを優先し、必要なら他の行を落とす。**
-  出欠2行分の長さは `AttendanceHook.lineLength(attendEventId)` で取れる。
-- 出欠リンクは全体で **約110字**。LINE の実測（地図128字は可／カレンダー453字は不可／237字は可）から見て、
-  地図リンクより短く安全圏。`s` にはデプロイIDだけを載せ、GASのURL全体は載せない。
+> ⚠ **旧システムはこの変更が公開された時点で新しい大会を受け取れなくなる。**
+> 白山クラブの移行（[migration-hakusan.md](migration-hakusan.md)）は、この変更の公開と同時か、先に行うこと。
 
 ---
 
-## 追加④ i18n（ja のみ）
+## 3言語同期
 
-v1 は日本語版だけ。en / in への同期は後でまとめて行う。
+`dropper-app` の鉄則どおり、`app.js` と `i18n.js` は3フォルダで**バイト単位で同一**。
+`index.html` の追加部分も3言語で完全同一（差分はもともとあるSEOヘッダと `window.LANG` だけ）。
 
-```js
-ja: {
-  attend_settings_title: '出欠システム',
-  attend_settings_url:   '出欠システムのURL（…/exec）',
-  attend_settings_key:   '書き込みキー',
-  attend_settings_save:  '保存して確認',
-  attend_create:         '出欠を作る',
-  attend_created:        '出欠は作成ずみ',
-  attend_creating:       '出欠を作っています…',
-  attend_ann_label:      '🙋 出欠を回答する'
-}
-```
+出欠UIは **`ATTEND_AVAILABLE`（`window.LANG` が ja のときだけ true）で日本語版にしか出していない**。
+`attend/` が日本語のため。i18n キーは en / in も揃えてあるので、`attend/` を訳したら
+`ATTEND_AVAILABLE` を外すだけで3言語に出せる。
 
 ---
 
-## 完了条件
+## 実機で確かめること
 
-要項のドロップ →「出欠を作る」→ 案内文コピー、までが一気通貫で通り、
-**LINE に貼ったときに出欠リンクが青下線・タップ可になること**（実機で確認）。
+自動テストでは、要項カード →「出欠を作る」→ 案内文 → その出欠リンクを開いて回答、までを
+ブラウザで通してある（GASは本物の `.gs` をNodeで実行して応答）。残るのは実機確認だけ。
+
+- [ ] **LINEに貼って、出欠リンクが青下線・タップ可になること**（110字。実測128字は可なので収まるはず）
+- [ ] LINE直行ボタン（`line.me/R/msg/text/?`）経由でも出欠リンクが壊れないこと
+- [ ] スマホのブラウザで `attend/` が開き、名前選択→回答まで通ること

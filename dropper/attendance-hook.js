@@ -1,5 +1,5 @@
 /* 出欠ドロッパー連携フック v1.0
-   カレンダードロッパー（dropper-app の calendar/）に読み込ませて使う小さなモジュール。
+   イベントドロッパー（dropper-app の calendar/）に読み込ませて使う小さなモジュール。
    calendar/app.js からは下の5つだけを呼べば足りるようにしてある。
 
      AttendanceHook.configured()            出欠システムが設定ずみか
@@ -167,6 +167,7 @@ var AttendanceHook = (function () {
     settings: settings,
     configured: configured,
     clear: clear,
+    apiUrlOf: apiUrl,          // 設定欄に「…/exec」の形で戻して見せるため
     saveSettings: saveSettings,
     createEvent: createEvent,
     linkFor: linkFor,

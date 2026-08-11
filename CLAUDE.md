@@ -35,8 +35,9 @@
 - LINEボットID：OZovWo / @015duxnb
 - MASTER_SS_ID：（大会出欠フォーム.gs内の定数）
 
-## カレンダードロッパーとの連携
-- 【旧】dropper-app の `?club=hakusan` モードがマスタシートに書き込む
-- 【旧】クラブ運用URLは必ず `?club=hakusan` を正確に末尾に付ける
-- 【新】`dropper/attendance-hook.js` を dropper-app の `calendar/` にコピーして使う（手順は `docs/dropper-integration.md`）
-- 【新】`?club=hakusan` の CLUB_MODE 分岐は移行完了後に撤去可否を判断する
+## イベントドロッパーとの連携
+- `dropper/attendance-hook.js` が原本。dropper-app の `calendar*/attendance-hook.js` にコピーして使う
+- dropper-app 側はカードの「🙋 出欠を作る」ボタン＋設定モーダルで実装ずみ（`docs/dropper-integration.md`）
+- **旧 `?club=hakusan`（CLUB_MODE・大会マスタ書き出し）は dropper-app から撤去ずみ。**
+  公開された時点で旧システムは新しい大会を受け取れなくなる → 移行を先に済ませること
+- 設定は localStorage の `dropper.attend.deployId` / `dropper.attend.writeKey`（`attend/setup.html` と同名キー）
