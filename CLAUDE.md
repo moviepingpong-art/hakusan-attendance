@@ -33,6 +33,10 @@
   （コピー直後の初回に必ず失敗する）。代わりに「はじめに」シートへ誘導を書いてある
 - セットアップ画面は保存前に、匿名で `?action=ping` を叩いて「アクセス：全員」を確認する。
   `/dev` で終わるURLは採用しない（本人しか開けないため）
+- `gas/appsscript.json` の `webapp` でデプロイ画面の初期値を「実行：自分／アクセス：全員」にしてある。
+  `oauthScopes` は**書かない**（Apps Scriptの自動判定に任せる。手で並べると書き漏らしが実行時に落ちる）
+- **Apps Script API でデプロイを自動化しない。** 利用者ごとに開発者向け設定でAPIアクセスを
+  許可させる必要があり手間が増えるうえ、`script.deployments` の追加は承認済みスコープの再審査を招く
 
 ## イベントドロッパーとの連携
 - `dropper/attendance-hook.js` が原本。dropper-app の `calendar*/attendance-hook.js` にコピーして使う

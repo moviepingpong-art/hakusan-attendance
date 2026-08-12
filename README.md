@@ -45,6 +45,7 @@ LINEグループ・LINE公式アカウント・メール等に任せます。
 | `gas/attendance-api.gs` | GAS本体（doGet / doPost 全action、初期設定メニュー） | 主催者のシートに同梱 |
 | `gas/tally.gs` | `shukei()`。男女別6列＋未回答者名 | 同上 |
 | `gas/setup-ui.html` | 表の中で動くセットアップ画面（団体名・人数分の名簿入力・デプロイ案内・URL発行） | 同上 |
+| `gas/appsscript.json` | マニフェスト。デプロイ画面の「実行：自分／アクセス：全員」を初期値にする | 同上 |
 | `dropper/attendance-hook.js` | イベントドロッパーに貼り込む連携モジュールの原本 | dropper-app へコピー |
 | `index.html` | 案内だけの入口ページ | — |
 
