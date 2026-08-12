@@ -3,376 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>大会出欠フォーム｜白山ラージボール卓球クラブ</title>
-
-<!-- LIFF SDK -->
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
+<meta name="robots" content="noindex">
+<title>出欠ドロッパー</title>
+<link rel="stylesheet" href="attend/attend.css">
 <style>
-  :root{
-    /* クラブカラー（山と空：青系＋差し色の赤）。〇×△は色で即判別 */
-    --bg:#eef3f7; --card:#ffffff; --ink:#1d2733; --sub:#5a6b7b;
-    --line:#d6e0ea; --brand:#1769b0; --brand-d:#0f4f88;
-    --maru:#1a8f4c;  --maru-bg:#e3f4ea;   /* 〇 参加 */
-    --batsu:#c0392b; --batsu-bg:#fbe7e4;  /* × 不参加 */
-    --sankaku:#b8860b; --sankaku-bg:#fbf3df; /* △ どちらでも */
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
-    font-size:17px; line-height:1.6; padding:0 0 48px;
-  }
-  header{
-    background:var(--brand); color:#fff; padding:18px 18px 16px;
-    position:sticky; top:0; z-index:5;
-  }
-  header h1{margin:0; font-size:19px; font-weight:700;}
-  header p{margin:4px 0 0; font-size:13px; opacity:.9;}
-  .me{
-    margin:10px 18px 0; font-size:14px; color:var(--sub);
-    display:flex; align-items:center; gap:8px;
-  }
-  .me b{color:var(--ink);}
-  .wrap{padding:14px;}
-
-  .card{
-    background:var(--card); border:1px solid var(--line); border-radius:14px;
-    margin:0 0 18px; overflow:hidden; box-shadow:0 1px 3px rgba(20,50,80,.06);
-  }
-  .card-head{padding:16px 16px 12px; border-bottom:1px solid var(--line);}
-  .card-head h2{margin:0 0 6px; font-size:18px; line-height:1.4;}
-  .meta{font-size:14px; color:var(--sub); margin:2px 0;}
-  .meta .deadline{color:var(--batsu); font-weight:700;}
-  .youkou-btn{
-    display:inline-block; margin-top:10px; padding:9px 16px;
-    background:#fff; color:var(--brand-d); border:2px solid var(--brand);
-    border-radius:9px; font-size:15px; font-weight:700; text-decoration:none;
-    cursor:pointer;
-  }
-  .youkou-btn:active{background:#e8f1f9;}
-  .youkou-box{margin-top:10px;}
-  .youkou-frame{
-    width:100%; height:70vh; border:1px solid var(--line);
-    border-radius:9px; background:#fff;
-  }
-
-  .event{padding:14px 16px; border-bottom:1px solid #eef2f6;}
-  .event:last-of-type{border-bottom:none;}
-  .event .name{font-weight:700; margin-bottom:10px; font-size:17px;}
-  .choices{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;}
-  .choice{
-    border:2px solid var(--line); border-radius:11px; padding:12px 4px;
-    text-align:center; cursor:pointer; background:#fff; user-select:none;
-    transition:transform .05s;
-  }
-  .choice:active{transform:scale(.97);}
-  .choice .mark{font-size:24px; font-weight:700; line-height:1;}
-  .choice .lab{display:block; font-size:12px; color:var(--sub); margin-top:5px;}
-  /* 選択中 */
-  .choice.sel-maru   {border-color:var(--maru);   background:var(--maru-bg);}
-  .choice.sel-maru .mark{color:var(--maru);}
-  .choice.sel-batsu  {border-color:var(--batsu);  background:var(--batsu-bg);}
-  .choice.sel-batsu .mark{color:var(--batsu);}
-  .choice.sel-sankaku{border-color:var(--sankaku);background:var(--sankaku-bg);}
-  .choice.sel-sankaku .mark{color:var(--sankaku);}
-
-  .submit{
-    width:calc(100% - 32px); margin:6px 16px 16px; padding:15px;
-    background:var(--brand); color:#fff; border:none; border-radius:12px;
-    font-size:17px; font-weight:700; cursor:pointer;
-  }
-  .submit:active{background:var(--brand-d);}
-  .submit:disabled{background:#9bb4c8;}
-  .card-msg{margin:0 16px 14px; font-size:14px; min-height:1.2em;}
-  .card-msg.ok{color:var(--maru); font-weight:700;}
-  .card-msg.ng{color:var(--batsu); font-weight:700;}
-
-  /* 初回の名前選択画面 */
-  .reg{padding:18px 16px;}
-  .reg h2{font-size:18px; margin:0 0 6px;}
-  .reg p.lead{font-size:14px; color:var(--sub); margin:0 0 16px;}
-  .names{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .nbtn{
-    border:2px solid var(--line); border-radius:11px; padding:16px 8px;
-    text-align:center; font-size:17px; background:#fff; cursor:pointer; user-select:none;
-  }
-  .nbtn:active{transform:scale(.98);}
-  .nbtn.sel{border-color:var(--brand); background:#e8f1f9; color:var(--brand-d); font-weight:700;}
-  .reg-confirm{
-    margin:18px 0 0; padding:15px; width:100%;
-    background:var(--brand); color:#fff; border:none; border-radius:12px;
-    font-size:17px; font-weight:700; cursor:pointer;
-  }
-  .reg-confirm:disabled{background:#9bb4c8;}
-  .reg-msg{margin:10px 0 0; font-size:14px; min-height:1.2em;}
-  .reg-msg.ng{color:var(--batsu); font-weight:700;}
-
-  .state{padding:48px 24px; text-align:center; color:var(--sub);}
-  .state.err{color:var(--batsu);}
-  .spinner{
-    width:34px;height:34px;margin:0 auto 14px;border:4px solid var(--line);
-    border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;
-  }
-  @keyframes spin{to{transform:rotate(360deg);}}
-  @media (prefers-reduced-motion:reduce){.spinner{animation:none;}}
+  .home{max-width:640px; margin:0 auto;}
+  .home h2{font-size:18px; margin:0 0 10px;}
+  .home p{font-size:15px; margin:8px 0;}
+  .home ul{font-size:15px; padding-left:1.3em; margin:8px 0;}
+  .home li{margin:6px 0;}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>大会出欠フォーム</h1>
-  <p>白山ラージボール卓球クラブ</p>
+  <h1>出欠ドロッパー</h1>
+  <p>案内文にリンクを1本足すだけの出欠システム</p>
 </header>
-<div class="me" id="me"></div>
 
-<div class="wrap" id="wrap">
-  <div class="state" id="state">
-    <div class="spinner"></div>
-    読み込んでいます…
+<div class="wrap home">
+  <div class="step">
+    <h2>はじめて使う主催者の方へ</h2>
+    <p>出欠の回答は、<b>主催者ご自身のGoogleスプレッドシート</b>にだけ保存されます。
+       セットアップは順番に案内します（15分ほど）。</p>
+    <p><a class="btn wide" href="https://app.dropper-tools.com/attend/setup.html">セットアップをはじめる</a></p>
+    <div class="hint">
+      <b>セットアップも、みなさんに配るURLも、かならず app.dropper-tools.com のものを使ってください。</b>
+      出欠ページは「どの端末か」をブラウザに覚えさせて本人を判別しています。
+      この記憶はアドレスの出どころ（オリジン）ごとに別物なので、URLの出どころが混ざると
+      回答する人がもう一度名前を選ぶことになります。
+    </div>
+  </div>
+
+  <div class="step">
+    <h2>このページについて</h2>
+    <p>ここは出欠ドロッパーの<b>ソースコード置き場</b>です。実際にお使いいただくページは
+       <a href="https://app.dropper-tools.com/attend/">app.dropper-tools.com/attend/</a> にあります。</p>
+    <ul>
+      <li><a href="https://github.com/moviepingpong-art/hakusan-attendance">GitHub リポジトリ</a></li>
+      <li><a href="https://github.com/moviepingpong-art/hakusan-attendance/blob/main/docs/setup-guide.md">セットアップ手順・データ構造・API仕様</a></li>
+    </ul>
   </div>
 </div>
 
-<script>
-/* ===== ここだけ設定してください ===== */
-const LIFF_ID = "2010475547-nDT2DLT8";
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwmS3DUX7BBmT2Vh7U3OkNWdD4Z5IWgLHOMIuqmkSfvMDrk7UBZNewfLsHCzFvq6-hv/exec";   // ← 裏方GASのウェブアプリURL
-/* ==================================== */
-
-const CHOICES = [
-  {key:"〇", cls:"sel-maru",    lab:"参加"},
-  {key:"△", cls:"sel-sankaku", lab:"どちらでも"},
-  {key:"×", cls:"sel-batsu",   lab:"不参加"},
-];
-
-let profile = null;        // {userId, displayName}
-const picks = {};          // picks[大会ID][種目] = "〇"|"×"|"△"
-let chosenName = null;     // 初回選択した名前（一時保持）
-
-main();
-
-async function main(){
-  try{
-    await liff.init({liffId: LIFF_ID});
-    if(!liff.isLoggedIn()){ liff.login(); return; }   // 未ログインならログインへ
-    profile = await liff.getProfile();
-    document.getElementById("me").innerHTML =
-      `回答者：<b>${escapeHtml(profile.displayName)}</b> さん`;
-
-    // 登録済みか確認 → 未登録なら名前選択画面、登録済みなら出欠へ
-    const who = await fetchJson(GAS_URL + "?action=whoami&userId=" + encodeURIComponent(profile.userId));
-    if(who.ok && who.registered){
-      await loadTournaments();
-    }else{
-      await showNamePicker();
-    }
-  }catch(err){
-    showState("読み込みに失敗しました。LINEからもう一度開いてください。<br><small>"+escapeHtml(String(err))+"</small>", true);
-  }
-}
-
-/* ===== 初回：名前選択画面 ===== */
-async function showNamePicker(){
-  const data = await fetchJson(GAS_URL + "?action=members");
-  if(!data.ok) throw new Error(data.error || "名簿取得エラー");
-  const members = data.members || [];
-
-  const wrap = document.getElementById("wrap");
-  let html = `<div class="reg">
-      <h2>はじめての方へ</h2>
-      <p class="lead">名簿からあなたのお名前を選んで「これで登録」を押してください。<br>登録は最初の1回だけです。</p>
-      <div class="names" id="names">`;
-  members.forEach((n, i)=>{
-    html += `<div class="nbtn" data-i="${i}">${escapeHtml(n)}</div>`;
-  });
-  html += `</div>
-      <button class="reg-confirm" id="regBtn" disabled>これで登録</button>
-      <p class="reg-msg" id="regMsg"></p>
-    </div>`;
-  wrap.innerHTML = html;
-
-  const namesEl = document.getElementById("names");
-  const regBtn  = document.getElementById("regBtn");
-  namesEl.addEventListener("click", e=>{
-    const b = e.target.closest(".nbtn");
-    if(!b) return;
-    namesEl.querySelectorAll(".nbtn").forEach(x=>x.classList.remove("sel"));
-    b.classList.add("sel");
-    chosenName = members[Number(b.dataset.i)];
-    regBtn.disabled = false;
-  });
-  regBtn.addEventListener("click", registerMe);
-}
-
-async function registerMe(){
-  const regBtn = document.getElementById("regBtn");
-  const msg = document.getElementById("regMsg");
-  if(!chosenName){ return; }
-  regBtn.disabled = true;
-  msg.className = "reg-msg";
-  msg.textContent = "登録中…";
-  try{
-    const body = { type:"register", userId:profile.userId, displayName:profile.displayName, chosenName:chosenName };
-    const data = await postJson(GAS_URL, body);
-    if(!data.ok) throw new Error(data.error || "登録エラー");
-    // 登録できたら、そのまま出欠フォームへ
-    await loadTournaments();
-  }catch(err){
-    msg.className = "reg-msg ng";
-    msg.textContent = "登録に失敗しました：" + String(err);
-    regBtn.disabled = false;
-  }
-}
-
-async function loadTournaments(){
-  const data = await fetchJson(GAS_URL);
-  if(!data.ok) throw new Error(data.error || "データ取得エラー");
-
-  const list = data.tournaments || [];
-  if(list.length === 0){
-    showState("現在、出欠を受付中の大会はありません。", false);
-    return;
-  }
-  renderForm(list);
-}
-
-function renderForm(list){
-  const wrap = document.getElementById("wrap");
-  wrap.innerHTML = "";
-
-  list.forEach(t=>{
-    picks[t.id] = {};
-    const card = document.createElement("div");
-    card.className = "card";
-
-    let html = `<div class="card-head">
-        <h2>${escapeHtml(t.taikaimei)}</h2>
-        ${t.kaisaibi  ? `<div class="meta">📅 開催：${escapeHtml(t.kaisaibi)}</div>`:""}
-        ${t.shimekiri ? `<div class="meta deadline">⏰ 締切：${escapeHtml(t.shimekiri)}</div>`:""}
-        ${t.youkouUrl ? `<button type="button" class="youkou-btn" data-url="${escapeHtml(t.youkouUrl)}">📄 要項を見る</button>
-        <div class="youkou-box" hidden></div>`:""}
-      </div>`;
-
-    t.shumoku.forEach((sh, idx)=>{
-      html += `<div class="event">
-          <div class="name">${escapeHtml(sh)}</div>
-          <div class="choices" data-tid="${t.id}" data-sh="${idx}">`;
-      CHOICES.forEach(c=>{
-        html += `<div class="choice" data-key="${c.key}" data-cls="${c.cls}">
-            <span class="mark">${c.key}</span><span class="lab">${c.lab}</span>
-          </div>`;
-      });
-      html += `</div></div>`;
-    });
-
-    html += `<button class="submit" data-tid="${t.id}">この大会の出欠を送信</button>
-             <p class="card-msg" id="msg-${t.id}"></p>`;
-    card.innerHTML = html;
-    wrap.appendChild(card);
-
-    // 種目名を idx → 実名で持っておく
-    card.querySelectorAll(".choices").forEach((grp, idx)=>{
-      grp.dataset.shname = t.shumoku[idx];
-    });
-
-    // 「要項を見る」→ フォーム内にPDFを開閉（別画面に飛ばない）
-    const yBtn = card.querySelector(".youkou-btn");
-    if(yBtn){
-      const box = card.querySelector(".youkou-box");
-      yBtn.addEventListener("click", ()=>{
-        const open = !box.hidden;
-        if(open){
-          box.hidden = true; box.innerHTML = "";
-          yBtn.textContent = "📄 要項を見る";
-        }else{
-          box.innerHTML = `<iframe class="youkou-frame" src="${yBtn.dataset.url}" loading="lazy"></iframe>`;
-          box.hidden = false;
-          yBtn.textContent = "✕ 要項を閉じる";
-        }
-      });
-    }
-  });
-
-  // 選択肢タップ
-  wrap.addEventListener("click", onChoiceTap);
-  // 送信
-  wrap.querySelectorAll(".submit").forEach(b=> b.addEventListener("click", ()=>submit(list, b.dataset.tid)));
-}
-
-function onChoiceTap(e){
-  const choice = e.target.closest(".choice");
-  if(!choice) return;
-  const grp = choice.closest(".choices");
-  const tid = grp.dataset.tid;
-  const shname = grp.dataset.shname;
-
-  grp.querySelectorAll(".choice").forEach(c=>{
-    c.classList.remove("sel-maru","sel-batsu","sel-sankaku");
-  });
-  choice.classList.add(choice.dataset.cls);
-  picks[tid][shname] = choice.dataset.key;
-}
-
-async function submit(list, tid){
-  const t = list.find(x=>x.id===tid);
-  const msg = document.getElementById("msg-"+tid);
-  const btn = document.querySelector(`.submit[data-tid="${tid}"]`);
-
-  // 全種目に回答済みかチェック
-  const unanswered = t.shumoku.filter(sh=> !picks[tid][sh]);
-  if(unanswered.length){
-    msg.className = "card-msg ng";
-    msg.textContent = "未選択の種目があります：" + unanswered.join("、");
-    return;
-  }
-
-  btn.disabled = true;
-  msg.className = "card-msg";
-  msg.textContent = "送信中…";
-
-  try{
-    const body = {
-      userId: profile.userId,
-      displayName: profile.displayName,
-      tournamentId: tid,
-      taikaimei: t.taikaimei,
-      answers: picks[tid],
-    };
-    const data = await postJson(GAS_URL, body);
-    if(!data.ok) throw new Error(data.error || "保存エラー");
-
-    msg.className = "card-msg ok";
-    msg.textContent = "✓ 送信しました。締切前なら何度でも修正できます。";
-  }catch(err){
-    msg.className = "card-msg ng";
-    msg.textContent = "送信に失敗しました：" + String(err);
-  }finally{
-    btn.disabled = false;
-  }
-}
-
-function showState(htmlText, isErr){
-  document.getElementById("wrap").innerHTML =
-    `<div class="state ${isErr?"err":""}">${htmlText}</div>`;
-}
-async function fetchJson(url){
-  const res = await fetch(url);
-  return await res.json();
-}
-async function postJson(url, body){
-  // GASはCORSプリフライトを避けるため text/plain で送る
-  const res = await fetch(url, {
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body: JSON.stringify(body),
-  });
-  return await res.json();
-}
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, m=>(
-    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]
-  ));
-}
-</script>
 </body>
 </html>

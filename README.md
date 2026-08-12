@@ -1,26 +1,24 @@
 # hakusan-attendance
 
-出欠システムのフロントエンドです。いま2世代が同居しています。
+**出欠ドロッパー** — 案内文にリンクを1本足すだけの出欠システム。どの団体でも使えます。
+LINE・LIFF には依存しません。
 
-- **`attend/` … 汎用版（出欠ドロッパー）v1** — どの団体でも使える。LINE・LIFFに依存しない
-- **ルートの3ファイル … 旧・白山クラブ専用版** — 移行が済むまで残す
-
-白山クラブ自身も汎用版へ移行します（[移行手順](docs/migration-hakusan.md)）。
+公開先：[app.dropper-tools.com/attend/](https://app.dropper-tools.com/attend/)
+（このリポジトリはソース。実際に配るURLは上記のものを使ってください）
 
 ---
 
-## 汎用版（`attend/`）
+## 考え方
 
-### 考え方
+**リンク方式。** [イベントドロッパー](https://app.dropper-tools.com/calendar/)の案内文に
+「🙋 出欠を回答する」リンクを1本足すだけ。配信は各団体がすでに持っている
+LINEグループ・LINE公式アカウント・メール等に任せます。
+このツール自体は **LIFF も LINEログイン も Messaging API も使いません**。
 
-**リンク方式。** イベントドロッパーの案内文に「🙋 出欠を回答する」リンクを1本足すだけ。
-配信は各団体がすでに持っている LINEグループ・LINE公式アカウント・メール等に任せる。
-このツール自体は **LIFF も LINEログイン も Messaging API も使わない**。
+**BYOB（Bring Your Own Backend）。** データは主催者自身のGoogleスプレッドシートにだけ保存されます。
+ランニングコストはゼロで、開発者が他団体の個人情報を預かりません。
 
-**BYOB（Bring Your Own Backend）。** データは主催者自身のGoogleスプレッドシートにだけ保存される。
-ランニングコストはゼロで、開発者が他団体の個人情報を預からない。
-
-参加者の識別は **名簿から名前を選ぶ＋端末記憶**（localStorage の UUID）。最初の1回だけ選べばよい。
+参加者の識別は **名簿から名前を選ぶ＋端末記憶**（localStorage の UUID）。最初の1回だけ選べば済みます。
 
 ```
 [主催者] 要項PDF
@@ -35,7 +33,7 @@
 [主催者のGASウェブアプリ] → [主催者のスプレッドシート]
 ```
 
-### ファイル
+## ファイル
 
 | ファイル | 役割 | 対象 |
 |---|---|---|
@@ -46,51 +44,48 @@
 | `attend/attend.js` `attend/attend.css` | 共通ロジック・共通スタイル | — |
 | `gas/attendance-api.gs` | GAS本体（doGet / doPost 全action、初期設定メニュー） | 主催者のシートに同梱 |
 | `gas/tally.gs` | `shukei()`。男女別6列＋未回答者名 | 同上 |
-| `dropper/attendance-hook.js` | イベントドロッパーに貼り込む連携モジュール | dropper-app へコピー |
+| `dropper/attendance-hook.js` | イベントドロッパーに貼り込む連携モジュールの原本 | dropper-app へコピー |
+| `index.html` | 案内だけの入口ページ | — |
 
-### URL
+## URL
 
 ```
-イベント個別： https://{公開先}/attend/?s={デプロイID}&e={イベントID}     ← 全体で約110字
-一覧　　　　： https://{公開先}/attend/?s={デプロイID}
-わたしの回答： https://{公開先}/attend/my.html?s={デプロイID}
-集計　　　　： https://{公開先}/attend/status.html?s={デプロイID}
+イベント個別： https://app.dropper-tools.com/attend/?s={デプロイID}&e={イベントID}   ← 全体で約110字
+一覧　　　　： https://app.dropper-tools.com/attend/?s={デプロイID}
+わたしの回答： https://app.dropper-tools.com/attend/my.html?s={デプロイID}
+集計　　　　： https://app.dropper-tools.com/attend/status.html?s={デプロイID}
 ```
 
 `s` は **GASのデプロイIDだけ**（`…/macros/s/【ここ】/exec`）。URL全体を載せると
-LINEがリンク化できない長さ（実測：237字は可・453字は不可）に入ってしまうため。
-`s` が露出しても、書き込みキーがなければイベントは作れない。
+LINEがリンク化できない長さ（実測：237字は可・453字は不可）に入ってしまうためです。
+`s` が露出しても、書き込みキーがなければイベントは作れません。
 
-### ドキュメント
+> ⚠ **配るURLの出どころ（オリジン）を混ぜないこと。**
+> 端末の記憶はオリジンごとに別物なので、`app.dropper-tools.com` と `github.io` を混ぜると
+> 回答する人が名前を選び直すことになります。**すべて app.dropper-tools.com に統一してください。**
+
+## ドキュメント
 
 - [セットアップ手順・データ構造・API仕様](docs/setup-guide.md)
-- [イベントドロッパー側の改修](docs/dropper-integration.md)
-- [白山クラブの移行手順](docs/migration-hakusan.md)
+- [イベントドロッパー側の連携](docs/dropper-integration.md)
+- [白山クラブの立ち上げ手順](docs/hakusan-setup.md)
 
-### 使う前に設定するところ
+## 使う前に設定するところ
 
 | 場所 | 何を |
 |---|---|
 | `attend/attend.js` の `TEMPLATE_COPY_URL` | 配布用テンプレのコピーURL（空だと `setup.html` が手動手順の案内になる） |
-| `dropper/attendance-hook.js` の `ATTEND_BASE` | `attend/` を公開したURL |
+| `dropper/attendance-hook.js` の `ATTEND_BASE` | `attend/` を公開したURL（dropper-app 側は設定ずみ） |
 
-### v1 でやらないこと
+## v1 でやらないこと
 
 ライセンス／課金ゲート、en・in 版への同期、要項PDFのフォーム内表示、プッシュ通知・自動リマインド、
 主催者向けの管理画面（**名簿もイベントもスプレッドシートを直接編集する。これは仕様**）。
 
----
+## 旧・白山クラブ専用版について
 
-## 旧・白山クラブ専用版（ルート）
-
-| ファイル | 役割 |
-|---|---|
-| `index.html` | 大会出欠フォーム（LIFF） |
-| `myanswers.html` | 自分のエントリー状況（LIFF） |
-| `status.html` | 出欠集計の閲覧 |
-
-公開URL：https://moviepingpong-art.github.io/hakusan-attendance/
-汎用版へ移行して2週間ほど様子を見たあと停止します。
+LIFF を使った旧システム（`index.html` / `myanswers.html` / `status.html`）がありましたが、
+**一度も運用しないまま役目を終えた**ため削除しました。履歴は git に残っています。
 
 ## ライセンス
 
