@@ -8,10 +8,7 @@
 <link rel="stylesheet" href="attend.css">
 <style>
   .dots{display:flex; gap:6px; justify-content:center; margin:16px 14px 0;}
-  .dots i{
-    width:9px; height:9px; border-radius:50%; background:var(--line);
-    display:block; transition:background .2s;
-  }
+  .dots i{width:9px; height:9px; border-radius:50%; background:var(--line); display:block; transition:background .2s;}
   .dots i.on{background:var(--brand);}
   .dots i.past{background:#9bb4c8;}
   .nav{display:flex; gap:10px; margin:18px 0 0;}
@@ -23,7 +20,7 @@
 
 <header>
   <h1>出欠システムのセットアップ</h1>
-  <p>主催者むけ ・ 全部で7ステップ（15分ほど）</p>
+  <p>主催者むけ ・ 15分ほど</p>
 </header>
 
 <div class="dots" id="dots"></div>
@@ -33,11 +30,11 @@
 
   <!-- 1 -->
   <section class="step" data-step hidden>
-    <h2><span class="num">1</span>テンプレートをコピーする</h2>
-    <p>出欠データを入れるスプレッドシートを、<b>あなたのGoogleドライブ</b>に作ります。
-       データはすべてあなたのGoogleの中にだけ保存されます。</p>
-    <p><button class="btn wide" type="button" id="copyTpl">テンプレートをコピーする</button></p>
-    <div class="hint">新しいタブが開いたら「コピーを作成」を押してください。押したらこのページに戻ってきます。
+    <h2><span class="num">1</span>表をコピーする</h2>
+    <p>出欠データを入れる表を、<b>あなたのGoogleドライブ</b>に作ります。
+       出欠の回答は、すべてあなたのGoogleの中にだけ保存されます。</p>
+    <p><button class="btn wide" type="button" id="copyTpl">表をコピーする</button></p>
+    <div class="hint">新しいタブが開いたら「コピーを作成」を押してください。
       名前は「〇〇クラブ 出欠」など分かりやすいものに変えてかまいません。</div>
     <div class="warn" id="tplWarn" hidden></div>
     <div class="nav"><button class="btn wide" type="button" data-next>コピーしました → 次へ</button></div>
@@ -45,127 +42,68 @@
 
   <!-- 2 -->
   <section class="step" data-step hidden>
-    <h2><span class="num">2</span>団体名を入れる</h2>
-    <p>コピーしたスプレッドシートを開くと、上のメニューに <b>「出欠システム」</b> が増えています。</p>
+    <h2><span class="num">2</span>あとは表の中で進めます</h2>
+    <p>コピーした表を開くと、上のメニューに <b>「出欠システム」</b> が増えています。
+       そこから <b>「セットアップを開く」</b> を押してください。</p>
     <div class="figure">
-      ファイル<span class="arrow">｜</span>編集<span class="arrow">｜</span>表示<span class="arrow">｜</span>…<span class="arrow">｜</span><b>出欠システム</b>
+      ファイル<span class="arrow">｜</span>編集<span class="arrow">｜</span>表示<span class="arrow">｜</span>…<span class="arrow">｜</span><b>出欠システム</b><br>
+      <span class="arrow">▸</span><b>セットアップを開く</b>
     </div>
-    <ol>
-      <li>メニュー <b>「出欠システム」→「初期設定（シートを作る）」</b> を1回押す<br>
-        <span style="color:var(--sub);font-size:14px;">（初回だけ「承認が必要です」と出ます。ご自身のアカウントを選んで許可してください）</span></li>
-      <li><b>「設定」シート</b> の B1 に団体名を入れる（例：白山ラージボール卓球クラブ）</li>
-    </ol>
-    <div class="hint">この団体名が、参加者の出欠ページの上に表示されます。</div>
+    <p>団体名とメンバーのお名前を入れるところから、みなさんに配るURLができあがるまで、
+       画面が順番に案内します。</p>
+    <ul>
+      <li>団体名を入れる</li>
+      <li><b>人数を入れると、その人数ぶんの入力欄</b>が出ます。お名前と男女を入れるだけ</li>
+      <li>公開（デプロイ）の手順を図で案内します</li>
+      <li>ちゃんと公開できたか、その場で確かめます</li>
+      <li>配る3本のURLと書き込みキーが出ます</li>
+    </ul>
+    <div class="warn">初回だけ「承認が必要です」と出ます。
+      <b>ご自身で作った表を、ご自身で許可するだけ</b>です。Googleの審査は要りません。</div>
     <div class="nav">
       <button class="btn sub" type="button" data-prev>もどる</button>
-      <button class="btn" type="button" data-next>次へ</button>
+      <button class="btn" type="button" data-next>終わりました → 次へ</button>
     </div>
   </section>
 
   <!-- 3 -->
   <section class="step" data-step hidden>
-    <h2><span class="num">3</span>ウェブアプリとして公開する</h2>
-    <p>スプレッドシートのメニューから <b>「拡張機能」→「Apps Script」</b> を開きます。</p>
-    <p>開いた画面の右上 <b>「デプロイ」</b> を押して、次のとおりに進めます。</p>
-    <div class="figure">
-      デプロイ<span class="arrow">▸</span><b>新しいデプロイ</b><br>
-      種類を選択（⚙）<span class="arrow">▸</span><b>ウェブアプリ</b><br>
-      次のユーザーとして実行<span class="arrow">▸</span><b>自分</b><br>
-      アクセスできるユーザー<span class="arrow">▸</span><b>全員</b><br>
-      <span class="arrow">▸</span><b>デプロイ</b>
+    <h2><span class="num">3</span>イベントドロッパーに登録する</h2>
+    <p>ここまでで、出欠システムは使える状態です。
+       最後に、<b>要項をドロップしたら出欠リンク付きの案内文ができる</b>ようにつなぎます。
+       登録はこのブラウザに1回だけです。</p>
+    <p>表のセットアップ画面に出ていた <b>ウェブアプリのURL</b> と <b>書き込みキー</b> を貼ってください。</p>
+
+    <div class="field">
+      <label for="execUrl">ウェブアプリのURL（…/exec）</label>
+      <input id="execUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+             placeholder="https://script.google.com/macros/s/... /exec">
     </div>
-    <div class="warn">
-      <b>「このアプリは確認されていません」</b>と警告が出ることがあります。<br>
-      これは<b>ご自身で作ったスクリプトを、ご自身で許可するだけ</b>です。Googleの審査は要りません。<br>
-      「詳細」→「（プロジェクト名）に移動」→「許可」と進んでください。
+    <div class="field">
+      <label for="writeKey">書き込みキー（32文字）</label>
+      <input id="writeKey" type="text" autocomplete="off" spellcheck="false" placeholder="例：a7Kd93mZ…">
     </div>
-    <div class="hint">
-      <b>「アクセスできるユーザー：全員」は必ず選んでください。</b>
-      ここが「自分のみ」だと、メンバーが出欠ページを開いてもエラーになります。
-    </div>
+    <p><button class="btn wide" type="button" id="saveBtn">確かめて登録する</button></p>
+    <p class="msg" id="saveMsg"></p>
+
+    <div class="warn"><b>書き込みキーは人に見せないでください。</b>
+      このキーを持っている人だけが、出欠のイベントを作れます。回答する人には必要ありません。</div>
     <div class="nav">
       <button class="btn sub" type="button" data-prev>もどる</button>
-      <button class="btn" type="button" data-next>デプロイしました → 次へ</button>
+      <button class="btn" type="button" data-next id="next3" disabled>次へ</button>
     </div>
   </section>
 
   <!-- 4 -->
   <section class="step" data-step hidden>
-    <h2><span class="num">4</span>出てきたURLを貼り付ける</h2>
-    <p>デプロイが終わると <b>ウェブアプリのURL</b>（<code>…/exec</code> で終わる長いURL）が表示されます。
-       「コピー」を押して、下の欄に貼り付けてください。</p>
-    <div class="field">
-      <label for="execUrl">ウェブアプリのURL</label>
-      <input id="execUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false"
-             placeholder="https://script.google.com/macros/s/... /exec">
-    </div>
-    <p><button class="btn wide" type="button" id="testBtn">つながるか確かめる</button></p>
-    <p class="msg" id="testMsg"></p>
-    <div class="hint">「つながりました」と出れば成功です。エラーが出るときは、ステップ3の
-      <b>アクセスできるユーザー＝全員</b> になっているか確かめてください。</div>
-    <div class="nav">
-      <button class="btn sub" type="button" data-prev>もどる</button>
-      <button class="btn" type="button" data-next id="next4" disabled>次へ</button>
-    </div>
-  </section>
-
-  <!-- 5 -->
-  <section class="step" data-step hidden>
-    <h2><span class="num">5</span>書き込みキーを控える</h2>
-    <p>カレンダードロッパーから出欠を作るための合い言葉です。
-       スプレッドシートのメニュー <b>「出欠システム」→「書き込みキーを表示」</b> で表示できます
-       （「設定」シートの B2 にも入っています）。</p>
-    <div class="field">
-      <label for="writeKey">書き込みキー（32文字）</label>
-      <input id="writeKey" type="text" autocomplete="off" spellcheck="false" placeholder="例：a7Kd93mZ…">
-    </div>
-    <p><button class="btn wide" type="button" id="keyBtn">キーを確かめて保存する</button></p>
-    <p class="msg" id="keyMsg"></p>
-    <div class="warn"><b>書き込みキーは人に見せないでください。</b>
-      このキーを持っている人だけが、出欠のイベントを作れます。回答する人には必要ありません。</div>
-    <div class="nav">
-      <button class="btn sub" type="button" data-prev>もどる</button>
-      <button class="btn" type="button" data-next id="next5" disabled>次へ</button>
-    </div>
-  </section>
-
-  <!-- 6 -->
-  <section class="step" data-step hidden>
-    <h2><span class="num">6</span>できあがったURL</h2>
+    <h2><span class="num">4</span>できあがったURL</h2>
     <p>この3本が、みなさんに配るURLです。LINE公式アカウントのリッチメニューや、
        団体のホームページに貼ってお使いください。</p>
     <div id="urls"></div>
     <div class="hint">個別のイベントへのリンク（<code>&amp;e=…</code>付き）は、
-      カレンダードロッパーが案内文の中に自動で入れてくれます。ここで控えるのは3本だけで大丈夫です。</div>
-    <div class="nav">
-      <button class="btn sub" type="button" data-prev>もどる</button>
-      <button class="btn" type="button" data-next>次へ</button>
-    </div>
-  </section>
-
-  <!-- 7 -->
-  <section class="step" data-step hidden>
-    <h2><span class="num">7</span>最後に名簿を書く</h2>
-    <p>スプレッドシートの <b>「名簿」シート</b> に、メンバーの名前と性別を書いてください。
-       <b>これが唯一の必須の入力</b>です。</p>
-    <div class="figure">
-      　　<b>A列</b>　　　　<b>B列</b>　　<b>C列</b><br>
-      1　名前　　　　性別　　備考<br>
-      2　山田 太郎　　男<br>
-      3　鈴木 花子　　女<br>
-      4　佐藤 一郎　　男　　　退会
-    </div>
-    <ul>
-      <li>参加者は、出欠ページを初めて開いたときに<b>この一覧から自分の名前を選びます</b>。</li>
-      <li>やめた人は備考に「退会」と書けば、選択肢に出なくなります（過去の回答は残ります）。</li>
-      <li>名簿もイベントも、スプレッドシートを直接なおしてください。管理画面はありません。</li>
-    </ul>
-    <div class="warn">
-      <b>あとで直したときの再デプロイの手順（大事）</b><br>
-      デプロイ <span class="arrow">▸</span> <b>デプロイを管理</b> <span class="arrow">▸</span> 鉛筆マーク
-      <span class="arrow">▸</span> バージョン「<b>新しいバージョン</b>」<span class="arrow">▸</span> デプロイ<br>
-      この手順ならURLは変わりません。<b>「新しいデプロイ」を何度も押すと動かなくなります。</b>
-    </div>
+      イベントドロッパーが案内文の中に自動で入れてくれます。ここで控えるのは3本だけで大丈夫です。</div>
+    <div class="warn">名簿を直したいときは、いつでも表のメニュー
+      <b>「出欠システム → セットアップを開く」</b>から。イベントは「イベント」シートに増えていきます。</div>
     <div class="nav">
       <button class="btn sub" type="button" data-prev>もどる</button>
       <button class="btn" type="button" id="doneBtn">完了</button>
@@ -195,11 +133,9 @@
   function show(i) {
     cur = Math.max(0, Math.min(steps.length - 1, i));
     steps.forEach(function (s, n) { s.hidden = (n !== cur); });
-    dots.forEach(function (d, n) {
-      d.className = n === cur ? 'on' : (n < cur ? 'past' : '');
-    });
+    dots.forEach(function (d, n) { d.className = n === cur ? 'on' : (n < cur ? 'past' : ''); });
     $stepno.textContent = (cur + 1) + ' / ' + steps.length;
-    if (cur === 5) paintUrls();
+    if (cur === 3) paintUrls();
     window.scrollTo(0, 0);
   }
 
@@ -218,74 +154,64 @@
     $copy.disabled = true;
     var $warn = document.getElementById('tplWarn');
     $warn.hidden = false;
-    $warn.innerHTML = '<b>テンプレートのURLがまだ設定されていません。</b><br>'
+    $warn.innerHTML = '<b>表のURLがまだ設定されていません。</b><br>'
       + '空のスプレッドシートを作り、「拡張機能 → Apps Script」に '
-      + '<code>attendance-api.gs</code> と <code>tally.gs</code> を貼り付けてから、'
+      + '<code>attendance-api.gs</code>・<code>tally.gs</code>・<code>setup-ui.html</code> を入れてから、'
       + 'メニュー「出欠システム → 初期設定」を実行してもセットアップできます。';
   }
 
-  /* ---- 4. 疎通確認 ---- */
+  /* ---- 3. ドロッパーへの登録 ---- */
   var $exec = document.getElementById('execUrl');
-  var $testMsg = document.getElementById('testMsg');
-  var $next4 = document.getElementById('next4');
-  if (deployId) $exec.value = ATTEND.apiUrl(deployId);
+  var $key = document.getElementById('writeKey');
+  var $msg = document.getElementById('saveMsg');
+  var $next3 = document.getElementById('next3');
 
-  document.getElementById('testBtn').addEventListener('click', function () {
+  if (deployId) $exec.value = ATTEND.apiUrl(deployId);
+  var savedKey = ATTEND.lsGet(ATTEND.STORE.writeKey);
+  if (savedKey) $key.value = savedKey;
+  if (deployId && savedKey) $next3.disabled = false;
+
+  document.getElementById('saveBtn').addEventListener('click', function () {
     var id = ATTEND.parseDeployId($exec.value);
+    var key = ($key.value || '').trim();
     if (!id) {
-      msg($testMsg, 'ng', 'URLが読み取れません。「https://script.google.com/macros/s/…/exec」の形をそのまま貼り付けてください。');
+      msg('ng', 'URLが読み取れません。「https://script.google.com/macros/s/…/exec」の形をそのまま貼り付けてください。');
       return;
     }
-    msg($testMsg, '', '確かめています…');
-    ATTEND.get('ping', null, id).then(function (res) {
+    if (!key) { msg('ng', '書き込みキーを貼り付けてください。'); return; }
+
+    msg('', '確かめています…');
+    ATTEND.post({ action: 'checkKey', key: key }, id).then(function (res) {
+      if (!res.keyOk) {
+        msg('ng', 'キーが一致しません。表のセットアップ画面に出ているキーをそのままコピーしてください。');
+        $next3.disabled = true;
+        return;
+      }
       deployId = id;
       org = res.org || '';
       ATTEND.lsSet(ATTEND.STORE.deployId, deployId);
       ATTEND.lsSet(ATTEND.STORE.org, org);
-      msg($testMsg, 'ok', '✓ つながりました：' + org);
-      $next4.disabled = false;
+      var stored = ATTEND.lsSet(ATTEND.STORE.writeKey, key);
+      msg('ok', stored
+        ? '✓ 登録しました：' + org + '　これで要項をドロップすると出欠リンクが入ります。'
+        : '✓ つながりました：' + org + '（このブラウザには保存できませんでした。ドロッパーの設定欄で貼り付けてください）');
+      $next3.disabled = false;
     }).catch(function (err) {
-      msg($testMsg, 'ng', String(err && err.message || err));
-      $next4.disabled = true;
+      msg('ng', String(err && err.message || err));
+      $next3.disabled = true;
     });
   });
 
-  /* ---- 5. 書き込みキー ---- */
-  var $key = document.getElementById('writeKey');
-  var $keyMsg = document.getElementById('keyMsg');
-  var $next5 = document.getElementById('next5');
-  var saved = ATTEND.lsGet(ATTEND.STORE.writeKey);
-  if (saved) { $key.value = saved; $next5.disabled = false; }
+  function msg(cls, text) {
+    $msg.className = 'msg' + (cls ? ' ' + cls : '');
+    $msg.textContent = text;
+  }
 
-  document.getElementById('keyBtn').addEventListener('click', function () {
-    var key = ($key.value || '').trim();
-    if (!key) { msg($keyMsg, 'ng', 'キーを貼り付けてください。'); return; }
-    if (!deployId) { msg($keyMsg, 'ng', '先にステップ4でURLを確かめてください。'); return; }
-
-    msg($keyMsg, '', '確かめています…');
-    ATTEND.post({ action: 'checkKey', key: key }, deployId).then(function (res) {
-      if (!res.keyOk) {
-        msg($keyMsg, 'ng', 'キーが一致しません。「設定」シートのB2をそのままコピーしてください。');
-        $next5.disabled = true;
-        return;
-      }
-      if (ATTEND.lsSet(ATTEND.STORE.writeKey, key)) {
-        msg($keyMsg, 'ok', '✓ このブラウザに保存しました。カレンダードロッパーがこのキーを使います。');
-      } else {
-        msg($keyMsg, 'ok', '✓ キーは合っています。（このブラウザには保存できませんでした。カレンダードロッパー側で貼り付けてください）');
-      }
-      $next5.disabled = false;
-    }).catch(function (err) {
-      msg($keyMsg, 'ng', String(err && err.message || err));
-      $next5.disabled = true;
-    });
-  });
-
-  /* ---- 6. できあがったURL ---- */
+  /* ---- 4. できあがったURL ---- */
   function paintUrls() {
     var box = document.getElementById('urls');
     if (!deployId) {
-      box.innerHTML = ATTEND.noteHtml('', 'まだURLが決まっていません。ステップ4にもどってください。', true);
+      box.innerHTML = ATTEND.noteHtml('', 'まだURLが決まっていません。ステップ3にもどってください。', true);
       return;
     }
     var list = [
@@ -323,11 +249,6 @@
   document.getElementById('doneBtn').addEventListener('click', function () {
     if (deployId) window.location.href = ATTEND.pageUrl('status.html', deployId);
   });
-
-  function msg(el, cls, text) {
-    el.className = 'msg' + (cls ? ' ' + cls : '');
-    el.textContent = text;
-  }
 
   show(0);
 })();
