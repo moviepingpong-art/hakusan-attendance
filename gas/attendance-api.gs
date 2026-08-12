@@ -14,9 +14,13 @@
  *   tally.gs 側で再宣言すると SyntaxError になるので絶対に書かないこと。
  */
 
-var API_VERSION = 'v1.0';
+var API_VERSION = 'v1.1';
+
+// 参加者に配る出欠ページの置き場所。セットアップ画面が3本のURLを組み立てるのに使う。
+var ATTEND_BASE = 'https://app.dropper-tools.com/attend/';
 
 var SH = {
+  INTRO:   'はじめに',
   CONFIG:  '設定',
   MEMBERS: '名簿',
   EVENTS:  'イベント',
@@ -576,12 +580,16 @@ function errMsg_(err) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('出欠システム')
-    .addItem('初期設定（シートを作る）', '初期設定')
+    .addItem('セットアップを開く', 'セットアップを開く')
     .addItem('集計を更新', 'shukei')
     .addSeparator()
+    .addItem('初期設定（シートを作り直す）', '初期設定')
     .addItem('書き込みキーを表示', '書き込みキーを表示')
     .addItem('書き込みキーを作り直す', '書き込みキーを作り直す')
     .addToUi();
+  // ここで showSidebar / showModalDialog は呼べない。onOpen は承認なしで走る簡易トリガーで、
+  // 画面を出す操作には承認が要るため、コピー直後の初回に必ず失敗する。
+  // 代わりに「はじめに」シートへメニューの押し方を書いてある。
 }
 
 /** 足りないシートを作り、見出しと書き込みキーを用意する。何度実行しても安全 */
@@ -604,18 +612,38 @@ function 初期設定() {
   // 設定シートだけは見出しが縦なので別あつかい
   var conf = ss.getSheetByName(SH.CONFIG);
   if (!conf) { conf = ss.insertSheet(SH.CONFIG, 0); made.push(SH.CONFIG); }
-  var labels = [['団体名'], ['書き込みキー'], ['タイムゾーン']];
-  conf.getRange(1, 1, 3, 1).setValues(labels).setFontWeight('bold');
+  var labels = [['団体名'], ['書き込みキー'], ['タイムゾーン'], ['デプロイID']];
+  conf.getRange(1, 1, 4, 1).setValues(labels).setFontWeight('bold');
   conf.setColumnWidth(1, 140);
   conf.setColumnWidth(2, 380);
-  if (!String(conf.getRange('B1').getValue() || '').trim()) conf.getRange('B1').setValue('わたしたちの団体');
   if (!String(conf.getRange('B2').getValue() || '').trim()) conf.getRange('B2').setValue(newWriteKey_());
   if (!String(conf.getRange('B3').getValue() || '').trim()) conf.getRange('B3').setValue(DEFAULT_TZ);
-  conf.getRange(1, 3, 3, 1).setValues([
+  conf.getRange(1, 3, 4, 1).setValues([
     ['出欠ページのヘッダに表示されます'],
-    ['カレンダードロッパーに登録するキー。人には見せないでください'],
-    ['ふつうは Asia/Tokyo のままで大丈夫です']
+    ['イベントドロッパーに登録するキー。人には見せないでください'],
+    ['ふつうは Asia/Tokyo のままで大丈夫です'],
+    ['セットアップ画面が自動で入れます。手で書き換えないでください']
   ]).setFontColor('#5a6b7b');
+
+  // 「はじめに」シート。コピー直後は承認前でサイドバーを自動で開けないので、
+  // メニューの押し方をシートそのものに書いておく。
+  var intro = ss.getSheetByName(SH.INTRO);
+  if (!intro) { intro = ss.insertSheet(SH.INTRO, 0); made.push(SH.INTRO); }
+  intro.clear();
+  intro.setColumnWidth(1, 720);
+  intro.getRange('A1').setValue('出欠ドロッパー')
+    .setFontSize(24).setFontWeight('bold').setFontColor('#1769b0');
+  intro.getRange('A2').setValue('上のメニュー「出欠システム」→「セットアップを開く」を押してください。')
+    .setFontSize(16).setFontWeight('bold');
+  intro.getRange('A3').setValue(
+    '\n団体名とメンバーのお名前を入れるところから、みなさんに配るURLができあがるまで、'
+    + '画面が順番にご案内します。\n\n'
+    + '※ はじめて開いたときは「承認が必要です」と出ます。ご自身で作った表なので、'
+    + 'ご自身のアカウントを選んで許可してください。\n'
+    + '※ このシートは消してかまいません。');
+  intro.getRange('A3').setWrap(true).setFontSize(13).setFontColor('#5a6b7b');
+  intro.setRowHeight(3, 130);
+  ss.setActiveSheet(intro);
 
   ensure(SH.MEMBERS, ['名前', '性別（男／女）', '備考'], [160, 130, 240]);
   ensure(SH.EVENTS,  ['イベントID', 'イベント名', '開催日', '申込締切', '種目（、区切り）', '要項リンク', '登録日時'],
@@ -626,12 +654,9 @@ function 初期設定() {
   ensure(SH.TALLY,   [], []);
 
   SpreadsheetApp.getUi().alert(
-    '初期設定が終わりました。\n\n' +
+    '準備ができました。\n\n' +
     (made.length ? '作ったシート：' + made.join('、') + '\n\n' : '') +
-    '次にやること\n' +
-    '1. 「設定」シートのB1に団体名を入れる\n' +
-    '2. 「名簿」シートにメンバーの名前と性別を書く\n' +
-    '3. デプロイ → 新しいデプロイ → ウェブアプリ（実行：自分／アクセス：全員）'
+    'つづけて、メニュー「出欠システム → セットアップを開く」を押してください。'
   );
 }
 
@@ -657,4 +682,163 @@ function newWriteKey_() {
     out += chars.charAt(raw.charCodeAt(i * 2) % chars.length);
   }
   return out;
+}
+
+
+/* ============================================================
+ *  セットアップ画面（シートの中で完結させる）
+ *  想定利用者は団体の役員。スプレッドシートの列やセルを直接さわらせないこと。
+ *  画面側は setup-ui.html。呼び出しは google.script.run 経由。
+ * ========================================================== */
+
+function セットアップを開く() {
+  ensureSheets_();
+  var html = HtmlService.createHtmlOutputFromFile('setup-ui')
+    .setWidth(680).setHeight(660);
+  SpreadsheetApp.getUi().showModalDialog(html, '出欠システムのセットアップ');
+}
+
+/** シートが無ければ黙って作る（セットアップ画面から先に入った人のため） */
+function ensureSheets_() {
+  if (!ss_().getSheetByName(SH.CONFIG) || !ss_().getSheetByName(SH.MEMBERS)) 初期設定();
+}
+
+/** 画面を開いたときの状態を全部まとめて返す */
+function setupState() {
+  ensureSheets_();
+  var c = cfg_();
+  var id = deployId_();
+  return {
+    org: c.org,
+    writeKey: c.key,
+    deployId: id,
+    links: id ? attendLinks_(id) : null,
+    members: members_(true).map(function (m) {
+      return { name: m.name, gender: m.gender, retired: m.retired };
+    })
+  };
+}
+
+function setupSaveOrg(org) {
+  var name = String(org || '').trim();
+  if (!name) throw new Error('団体名を入れてください。');
+  if (name.length > 40) throw new Error('団体名が長すぎます（40文字まで）。');
+  sheet_(SH.CONFIG).getRange('B1').setValue(name);
+  return { ok: true, org: name };
+}
+
+/**
+ * 名簿をまるごと書き直す。備考は名前で引き継ぐ（退会の印を消さないため）。
+ * 同じ名前が2人いると本人を見分けられなくなるので、ここで弾く。
+ */
+function setupSaveMembers(list) {
+  var rows = (list || []).map(function (m) {
+    return { name: String((m && m.name) || '').trim(), gender: normGender_(m && m.gender) };
+  }).filter(function (m) { return m.name; });
+
+  if (!rows.length) throw new Error('お名前がひとつも入っていません。');
+  if (rows.length > 500) throw new Error('人数が多すぎます（500人まで）。');
+
+  var seen = {};
+  var dup = [];
+  rows.forEach(function (m) {
+    var k = normKey_(m.name);
+    if (seen[k]) { if (dup.indexOf(m.name) === -1) dup.push(m.name); }
+    seen[k] = true;
+  });
+  if (dup.length) {
+    throw new Error('同じお名前が2人以上います：' + dup.join('、')
+      + '\n出欠は名前で見分けるので、「山田太郎（父）」のように区別できる書き方にしてください。');
+  }
+
+  var notes = {};
+  members_(true).forEach(function (m) { notes[normKey_(m.name)] = m.retired ? '退会' : ''; });
+
+  var sh = sheet_(SH.MEMBERS);
+  var last = sh.getLastRow();
+  if (last > 1) sh.getRange(2, 1, last - 1, 3).clearContent();
+  sh.getRange(2, 1, rows.length, 3).setValues(rows.map(function (m) {
+    return [m.name, m.gender, notes[normKey_(m.name)] || ''];
+  }));
+  return { ok: true, count: rows.length };
+}
+
+/**
+ * デプロイ済みのウェブアプリURLを保存する。
+ * 保存の前に、ログインしていない人として実際に叩いて確かめる。
+ * ここを省くと「アクセスできるユーザー：自分のみ」のまま配ってしまい、
+ * 参加者の画面がエラーになる（いちばん多い事故）。
+ */
+function setupSaveDeploy(url) {
+  var id = parseDeployId_(url);
+  if (!id) throw new Error('URLを読み取れませんでした。「https://script.google.com/macros/s/…/exec」の形のまま貼り付けてください。');
+
+  var res;
+  try {
+    res = UrlFetchApp.fetch('https://script.google.com/macros/s/' + id + '/exec?action=ping', {
+      muteHttpExceptions: true, followRedirects: true
+    });
+  } catch (e) {
+    throw new Error('URLにつながりませんでした。デプロイが終わっているかご確認ください。');
+  }
+
+  var body = String(res.getContentText() || '');
+  var data = null;
+  try { data = JSON.parse(body); } catch (e) { /* HTMLが返ってきた＝公開できていない */ }
+
+  if (!data || data.ok !== true) {
+    if (/ServiceLogin|accounts\.google\.com|ログイン/.test(body)) {
+      throw new Error('だれでも開ける状態になっていません。デプロイをやりなおして、'
+        + '「アクセスできるユーザー」を【全員】にしてください。');
+    }
+    throw new Error('出欠システムとして応答しませんでした。貼り付けたURLがこの表のものか、もう一度ご確認ください。');
+  }
+
+  sheet_(SH.CONFIG).getRange('B4').setValue(id);
+  return { ok: true, org: data.org || cfg_().org, deployId: id, links: attendLinks_(id) };
+}
+
+/** デプロイ済みならURLを自分で拾ってみる（拾えないこともあるので、その時は手で貼ってもらう） */
+function setupGuessDeployUrl() {
+  var url = '';
+  try { url = String(ScriptApp.getService().getUrl() || ''); } catch (e) { url = ''; }
+  // /dev はログインした本人しか開けない。参加者に配れないので採用しない。
+  if (!/\/exec$/.test(url)) return { ok: false, url: '' };
+  return { ok: true, url: url };
+}
+
+function setupNewWriteKey() {
+  var key = newWriteKey_();
+  sheet_(SH.CONFIG).getRange('B2').setValue(key);
+  return { ok: true, writeKey: key };
+}
+
+/** 名簿シートを開いて画面を閉じたいとき用 */
+function setupOpenSheet(which) {
+  var name = (which === 'members') ? SH.MEMBERS : (which === 'tally') ? SH.TALLY : SH.CONFIG;
+  var sh = ss_().getSheetByName(name);
+  if (sh) ss_().setActiveSheet(sh);
+  return { ok: true };
+}
+
+function attendLinks_(id) {
+  var q = '?s=' + encodeURIComponent(id);
+  return {
+    list:   ATTEND_BASE + q,
+    my:     ATTEND_BASE + 'my.html' + q,
+    status: ATTEND_BASE + 'status.html' + q
+  };
+}
+
+function deployId_() {
+  return String(sheet_(SH.CONFIG).getRange('B4').getValue() || '').trim();
+}
+
+/** 貼り付けられたのが /exec のフルURLでも、IDだけでも受け取る */
+function parseDeployId_(raw) {
+  var s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  var m = s.match(/\/macros\/s\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{20,200}$/.test(s) ? s : '';
 }
