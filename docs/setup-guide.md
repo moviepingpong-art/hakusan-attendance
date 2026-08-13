@@ -18,8 +18,13 @@
 3. `コード.gs` の中身を消し、[`gas/attendance-api.gs`](../gas/attendance-api.gs) を丸ごと貼り付けてファイル名を `attendance-api` にする。
 4. ファイルを追加して [`gas/tally.gs`](../gas/tally.gs) を貼り付け、`tally` という名前にする。
    - `SS_ID` 等のグローバル定数は **`attendance-api.gs` でだけ宣言している**。`tally.gs` で再宣言すると SyntaxError になる。
-5. **ファイル → HTML** で追加し、[`gas/setup-ui.html`](../gas/setup-ui.html) を貼り付けて `setup-ui` という名前にする。
-   - 拡張子は付けない（Apps Script が `.html` を足す）。`setupの画面` はこのファイル名で呼び出している。
+5. **ファイル → HTML** で追加し、[`gas/setup-ui.html`](../gas/setup-ui.html) を貼り付ける。
+   名前の入力欄には **`setup-ui` とだけ入れる**。`.html` は Apps Script が自動で付けるので、
+   ファイル一覧には `setup-ui.html` と表示される。
+   - **HTMLだけは名前が一致していないと動かない。** `セットアップを開く()` が
+     `HtmlService.createHtmlOutputFromFile('setup-ui')` と名前で呼び出しているため。
+   - 逆に **`.gs` のファイル名は何でもよい**（すべて1つの領域にまとめて読み込まれるので、
+     `tally` が `tarry` でも動く）。ただし後で迷わないよう、この文書と同じ名前にしておく。
 6. **マニフェストを差し替える**（デプロイ画面のプルダウンを先に埋めておくため。下記「マニフェスト」参照）。
    - 左の歯車 **プロジェクトの設定** → **「`appsscript.json` マニフェスト ファイルをエディタで表示する」にチェック**
    - エディタに出た `appsscript.json` の中身を [`gas/appsscript.json`](../gas/appsscript.json) で置き換える
