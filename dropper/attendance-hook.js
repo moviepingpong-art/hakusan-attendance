@@ -142,7 +142,7 @@ var AttendanceHook = (function () {
     return String(v).trim();
   }
 
-  /** 出欠ページのURL。全体で110字前後に収まるので、LINEでもリンク化される */
+  /** 出欠ページのURL。全体で125字前後に収まるので、LINEでもリンク化される */
   function linkFor(eventId) {
     var s = settings();
     if (!s.deployId || !eventId) return '';
