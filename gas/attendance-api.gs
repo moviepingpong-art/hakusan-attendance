@@ -612,18 +612,20 @@ function 初期設定() {
   // 設定シートだけは見出しが縦なので別あつかい
   var conf = ss.getSheetByName(SH.CONFIG);
   if (!conf) { conf = ss.insertSheet(SH.CONFIG, 0); made.push(SH.CONFIG); }
-  var labels = [['団体名'], ['書き込みキー'], ['タイムゾーン'], ['デプロイID']];
-  conf.getRange(1, 1, 4, 1).setValues(labels).setFontWeight('bold');
+  var labels = [['団体名'], ['書き込みキー'], ['タイムゾーン'], ['デプロイID'], ['ファイルID']];
+  conf.getRange(1, 1, 5, 1).setValues(labels).setFontWeight('bold');
   conf.setColumnWidth(1, 140);
   conf.setColumnWidth(2, 380);
   if (!String(conf.getRange('B2').getValue() || '').trim()) conf.getRange('B2').setValue(newWriteKey_());
   if (!String(conf.getRange('B3').getValue() || '').trim()) conf.getRange('B3').setValue(DEFAULT_TZ);
-  conf.getRange(1, 3, 4, 1).setValues([
+  conf.getRange(1, 3, 5, 1).setValues([
     ['出欠ページのヘッダに表示されます'],
     ['イベントドロッパーに登録するキー。人には見せないでください'],
     ['ふつうは Asia/Tokyo のままで大丈夫です'],
-    ['セットアップ画面が自動で入れます。手で書き換えないでください']
+    ['セットアップ画面が自動で入れます。手で書き換えないでください'],
+    ['コピーされたことを見分けるための控えです。手で書き換えないでください']
   ]).setFontColor('#5a6b7b');
+  conf.getRange('B5').setValue(ss.getId());
 
   // 「はじめに」シート。コピー直後は承認前でサイドバーを自動で開けないので、
   // メニューの押し方をシートそのものに書いておく。
@@ -701,6 +703,32 @@ function セットアップを開く() {
 /** シートが無ければ黙って作る（セットアップ画面から先に入った人のため） */
 function ensureSheets_() {
   if (!ss_().getSheetByName(SH.CONFIG) || !ss_().getSheetByName(SH.MEMBERS)) 初期設定();
+  resetIfCopied_();
+}
+
+/**
+ * この表がコピーされたものなら、前の持ち主から引き継いではいけない値を捨てる。
+ *
+ * 「設定」B5 に自分のファイルIDを控えてあり、コピーすると中身だけが引き継がれて
+ * ファイルIDは変わる。食い違っていたら＝コピー直後、と判断できる。
+ *
+ *  - 書き込みキー … 引き継ぐと全団体で同じキーになる。他団体のキーを知っている人が
+ *                   別団体のイベントを作れてしまうので、必ず作り直す
+ *  - デプロイID   … 引き継ぐとセットアップ画面が「完成」から始まり、
+ *                   コピー元のデプロイを指したURLを配ってしまう。必ず捨てる
+ *
+ * 団体名と名簿はそのままにする（自分の表を複製して別の団体を作る使い方を壊さないため）。
+ */
+function resetIfCopied_() {
+  var sh = sheet_(SH.CONFIG);
+  var mine = ss_().getId();
+  var stamped = String(sh.getRange('B5').getValue() || '').trim();
+  if (stamped === mine) return false;
+
+  sh.getRange('B2').setValue(newWriteKey_());
+  sh.getRange('B4').setValue('');
+  sh.getRange('B5').setValue(mine);
+  return true;
 }
 
 /** 画面を開いたときの状態を全部まとめて返す */
