@@ -12,7 +12,7 @@ var ATTEND = (function () {
   /* ===== 配布時にここだけ差し替える =====
      主催者向けテンプレのスプレッドシートのコピーURL（末尾を /copy にしたもの）。
      空のままだと setup.html の1番目のボタンが「準備中」になります。 */
-  var TEMPLATE_COPY_URL = '';
+  var TEMPLATE_COPY_URL = 'https://docs.google.com/spreadsheets/d/1ESlESrWQLGtwR-n2QHbK6AssZKuc84AUVWo_Ke_g0ew/copy';
   /* ====================================== */
 
   var DEVICE_KEY = 'attend.deviceId';
