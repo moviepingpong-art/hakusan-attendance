@@ -29,7 +29,14 @@ var AttendanceHook = (function () {
   var TIMEOUT_MS = 25000;
 
   function lsGet(k) { try { return window.localStorage.getItem(k) || ''; } catch (e) { return ''; } }
-  function lsSet(k, v) { try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  // 書いたあと読み直して確かめる。プライベートブラウズやCookieのブロック下では
+  // setItem が例外を投げず、黙って捨てられることがあるため（保存できたと誤認させない）。
+  function lsSet(k, v) {
+    try {
+      window.localStorage.setItem(k, v);
+      return window.localStorage.getItem(k) === v;
+    } catch (e) { return false; }
+  }
   function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) { /* noop */ } }
 
   function parseDeployId(raw) {
@@ -97,10 +104,11 @@ var AttendanceHook = (function () {
 
     return call(deployId, { action: 'checkKey', key: writeKey }).then(function (res) {
       if (!res.keyOk) throw new Error('書き込みキーが違います。スプレッドシートの「設定」シートB2をご確認ください。');
-      lsSet(STORE.deployId, deployId);
-      lsSet(STORE.writeKey, writeKey);
+      // 保存できたかは呼び出し側に返す。黙って握りつぶすと「✓ つながりました」と出たのに
+      // 次に開くと設定が消えている、という分かりにくい状態になる（2026-08-16の実機で発生）。
+      var stored = lsSet(STORE.deployId, deployId) && lsSet(STORE.writeKey, writeKey);
       lsSet(STORE.org, res.org || '');
-      return { org: res.org || '', deployId: deployId };
+      return { org: res.org || '', deployId: deployId, stored: stored };
     });
   }
 

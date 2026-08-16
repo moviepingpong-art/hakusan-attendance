@@ -18,6 +18,10 @@
 - GASへのPOSTは `Content-Type: text/plain`（`application/json` はプリフライトでこける）
 - 定数はすべて `attendance-api.gs` でのみ宣言（`tally.gs` で再宣言しない→SyntaxError）
 - 回答は上書きせず追記し、集計は latest-row-wins
+- **デプロイIDを目で読んで打ち直さない**（72字。`I`と`l`、`0`と`O`が紛らわしい）。
+  1文字違うと404が返り、その404ページにCORSヘッダーが無いので
+  **ブラウザは「CORSでブロック」と報告する**。CORSと出たらまず404を疑うこと
+- localStorageは書いたあと読み直して確かめる（ブロック下では例外を投げず黙って捨てる実装がある）
 
 ## ⚠ オリジンを混ぜない
 端末IDの記憶は**アドレスの出どころごとに別物**。`app.dropper-tools.com` と

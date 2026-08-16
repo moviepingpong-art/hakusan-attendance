@@ -31,7 +31,14 @@ var ATTEND = (function () {
 
   /* ---------- localStorage（プライベートモードでも落ちないように） ---------- */
   function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
-  function lsSet(k, v) { try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  // 書いたあと読み直して確かめる。プライベートブラウズやCookieのブロック下では
+  // setItem が例外を投げず、黙って捨てられることがあるため（保存できたと誤認させない）。
+  function lsSet(k, v) {
+    try {
+      window.localStorage.setItem(k, v);
+      return window.localStorage.getItem(k) === v;
+    } catch (e) { return false; }
+  }
   function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) { /* noop */ } }
 
   /* ---------- 端末ID ---------- */
