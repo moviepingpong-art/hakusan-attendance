@@ -1,6 +1,10 @@
 /* 出欠ドロッパー 共通ロジック v1.0
    - 主催者のGASウェブアプリを ?s=デプロイID で呼び分ける
    - 参加者の識別は端末ID（localStorageのUUID）。LINE・LIFFには一切依存しない
+
+   キャッシュ対策：attend.js・attend.css を呼ぶ4本の *.html には ?v=YYYYMMDD を付けてある。
+   中身を更新したら、4本とも同じ日付に書き換えること（スマホのブラウザ／LINEアプリ内ブラウザは
+   古いJSを長く抱え込むことがあるため）。
 */
 var ATTEND = (function () {
   'use strict';
