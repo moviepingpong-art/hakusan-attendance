@@ -826,15 +826,6 @@ function setupSaveDeploy(url) {
   return { ok: true, org: data.org || cfg_().org, deployId: id, links: attendLinks_(id) };
 }
 
-/** デプロイ済みならURLを自分で拾ってみる（拾えないこともあるので、その時は手で貼ってもらう） */
-function setupGuessDeployUrl() {
-  var url = '';
-  try { url = String(ScriptApp.getService().getUrl() || ''); } catch (e) { url = ''; }
-  // /dev はログインした本人しか開けない。参加者に配れないので採用しない。
-  if (!/\/exec$/.test(url)) return { ok: false, url: '' };
-  return { ok: true, url: url };
-}
-
 function setupNewWriteKey() {
   var key = newWriteKey_();
   sheet_(SH.CONFIG).getRange('B2').setValue(key);

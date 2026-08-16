@@ -52,7 +52,7 @@ LINEグループ・LINE公式アカウント・メール等に任せます。
 ## URL
 
 ```
-イベント個別： https://app.dropper-tools.com/attend/?s={デプロイID}&e={イベントID}   ← 全体で約110字
+イベント個別： https://app.dropper-tools.com/attend/?s={デプロイID}&e={イベントID}   ← 全体で約125字
 一覧　　　　： https://app.dropper-tools.com/attend/?s={デプロイID}
 わたしの回答： https://app.dropper-tools.com/attend/my.html?s={デプロイID}
 集計　　　　： https://app.dropper-tools.com/attend/status.html?s={デプロイID}
@@ -61,6 +61,9 @@ LINEグループ・LINE公式アカウント・メール等に任せます。
 `s` は **GASのデプロイIDだけ**（`…/macros/s/【ここ】/exec`）。URL全体を載せると
 LINEがリンク化できない長さ（実測：237字は可・453字は不可）に入ってしまうためです。
 `s` が露出しても、書き込みキーがなければイベントは作れません。
+
+> デプロイIDの実測は **72字**（2026-08-13）。個別リンクは全体で **125字** になります。
+> 引き継ぎ資料の想定（57字・110字）より長いものの、リンク化できる範囲に収まっています。
 
 > ⚠ **配るURLの出どころ（オリジン）を混ぜないこと。**
 > 端末の記憶はオリジンごとに別物なので、`app.dropper-tools.com` と `github.io` を混ぜると

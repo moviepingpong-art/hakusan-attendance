@@ -158,7 +158,6 @@
 <section class="step" data-step hidden>
   <h2><span class="num">4</span>つながるか確かめます</h2>
   <p>デプロイのあとに出てきた <b>ウェブアプリのURL</b>（<code>…/exec</code> で終わるもの）を貼ってください。</p>
-  <p><button class="btn sub wide" type="button" id="guess">URLを自動で調べてみる</button></p>
   <label class="f" for="deployUrl">ウェブアプリのURL</label>
   <input type="url" id="deployUrl" placeholder="https://script.google.com/macros/s/.../exec">
   <p><button class="btn wide" type="button" id="check">確かめて保存する</button></p>
@@ -364,21 +363,6 @@
   });
 
   /* ---------- 4. URL確認 ---------- */
-  document.getElementById('guess').addEventListener('click', function () {
-    var m = document.getElementById('depMsg');
-    msg(m, '', '調べています…');
-    google.script.run.withSuccessHandler(function (r) {
-      if (r.ok && r.url) {
-        document.getElementById('deployUrl').value = r.url;
-        msg(m, 'ok', '✓ 見つかりました。「確かめて保存する」を押してください。');
-      } else {
-        msg(m, 'ng', '自動では見つかりませんでした。お手数ですが、Apps Scriptの画面に出ているURLを貼り付けてください。');
-      }
-    }).withFailureHandler(function (e) {
-      msg(m, 'ng', e && e.message ? e.message : String(e));
-    }).setupGuessDeployUrl();
-  });
-
   document.getElementById('check').addEventListener('click', function () {
     var m = document.getElementById('depMsg');
     var v = (document.getElementById('deployUrl').value || '').trim();
