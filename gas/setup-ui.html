@@ -4,7 +4,8 @@
 <base target="_top">
 <meta charset="UTF-8">
 <style>
-  /* スプレッドシートのダイアログの中で動く。外部CSSは読み込めないので全部ここに書く。
+  /* スプレッドシートの【サイドバー】の中で動く。外部CSSは読み込めないので全部ここに書く。
+     幅は約300pxで固定（Googleが決めるので広げられない）。狭い方を既定として組む。
      想定利用者は団体の役員（60代も普通にいる）。文字は大きめ、押すところは広めに。 */
   :root{
     --ink:#1d2733; --sub:#5a6b7b; --line:#d6e0ea; --brand:#1769b0; --brand-d:#0f4f88;
@@ -21,8 +22,8 @@
   .dots i.on{background:var(--brand);} .dots i.past{background:#9bb4c8;}
   .stepno{text-align:center; font-size:12px; color:var(--sub); margin:0 0 12px;}
 
-  .step{padding:0 20px;}
-  h2{font-size:19px; margin:0 0 10px; display:flex; align-items:center; gap:10px;}
+  .step{padding:0 14px;}
+  h2{font-size:17px; margin:0 0 10px; display:flex; align-items:center; gap:9px; line-height:1.4;}
   h2 .num{flex:none; width:28px; height:28px; border-radius:50%; background:var(--brand); color:#fff;
     font-size:14px; display:flex; align-items:center; justify-content:center;}
   p{margin:8px 0;}
@@ -48,21 +49,27 @@
   .btn:disabled{background:#9bb4c8; cursor:default;}
   .btn.sub{background:#fff; color:var(--brand-d); border:2px solid var(--brand);}
   .btn.wide{display:block; width:100%;}
-  .nav{display:flex; gap:10px; margin:18px 0 0;}
-  .nav .btn{flex:1;}
+  /* 300px幅では横並びにすると1つ110px程度になり文字が潰れる。縦に積む。
+     主たる動作（次へ）を上、もどるを下に置く。 */
+  .nav{display:flex; flex-direction:column-reverse; gap:8px; margin:18px 0 0;}
+  .nav .btn{width:100%;}
 
   .msg{font-size:13.5px; margin:10px 0 0; min-height:1.3em; white-space:pre-wrap;}
   .msg.ok{color:var(--ok); font-weight:700;}
   .msg.ng{color:var(--ng); font-weight:700;}
 
   /* 名簿の入力欄 */
-  .members{max-height:280px; overflow-y:auto; border:1px solid var(--line);
+  .members{max-height:340px; overflow-y:auto; border:1px solid var(--line);
     border-radius:9px; padding:8px; margin:10px 0 0;}
-  .mrow{display:flex; gap:7px; align-items:center; margin:0 0 7px;}
-  .mrow .no{flex:none; width:26px; text-align:right; font-size:12px; color:var(--sub);}
-  .mrow input{flex:1; padding:8px 10px; font-size:14px;}
-  .mrow select{flex:none; width:82px; padding:8px 4px; font-size:14px;}
-  .mrow .del{flex:none; width:30px; height:30px; border:1px solid var(--line);
+  /* 幅300pxでは1行に詰められない。名前を1段目に幅いっぱい、番号・性別・削除を2段目に置く。
+     名前がいちばん打ちにくい欄なので、ここを最優先で広く取る。 */
+  .mrow{display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+    margin:0 0 9px; padding:0 0 9px; border-bottom:1px solid var(--line);}
+  .mrow:last-child{border-bottom:none; padding-bottom:0;}
+  .mrow input{flex:1 1 100%; padding:9px 10px; font-size:15px;}
+  .mrow .no{flex:none; width:26px; font-size:12px; color:var(--sub);}
+  .mrow select{flex:1; padding:7px 4px; font-size:14px;}
+  .mrow .del{flex:none; width:34px; height:34px; border:1px solid var(--line);
     background:#fff; color:var(--sub); border-radius:7px; font-size:15px; line-height:1;}
   .addrow{margin:4px 0 0;}
   .addrow button{border:1px dashed var(--brand); background:#fff; color:var(--brand-d);
@@ -71,9 +78,10 @@
   /* できあがったURL */
   .url{margin:14px 0 0;}
   .url .t{font-size:13.5px; font-weight:700; margin:0 0 5px;}
-  .url .row{display:flex; gap:7px;}
-  .url input{flex:1; min-width:0; padding:9px; font-size:12.5px; background:#f8fbfd;}
-  .url .btn{flex:none; padding:9px 13px; font-size:13px;}
+  /* 300px幅で横に並べると入力欄が数十pxになる。縦に積んでコピーボタンを幅いっぱいに。 */
+  .url .row{display:flex; flex-direction:column; gap:6px;}
+  .url input{width:100%; min-width:0; padding:9px; font-size:12px; background:#f8fbfd;}
+  .url .btn{width:100%; padding:9px 13px; font-size:13px;}
   .url .d{font-size:12.5px; color:var(--sub); margin:3px 0 0;}
   .key{background:var(--ng-bg); border:1px solid #f0b9b2; border-radius:9px; padding:12px; margin:16px 0 0;}
   .key .t{font-weight:700; font-size:13.5px; margin:0 0 6px;}
@@ -129,13 +137,16 @@
 <!-- 3. デプロイ -->
 <section class="step" data-step hidden>
   <h2><span class="num">3</span>みんなが使えるように公開します</h2>
-  <p>ここだけ、Googleの画面での操作になります。上のメニューから
-     <b>「拡張機能」→「Apps Script」</b>を開いてください。</p>
+  <p>ここだけ、Googleの画面での操作になります。下のボタンで新しいタブが開きます。</p>
+  <p><button class="btn wide" type="button" id="openScript">Apps Script を開く ↗</button></p>
+  <p class="msg" id="scriptMsg"></p>
   <div class="figure">
-    右上の <b>デプロイ</b><span class="arrow">▸</span><b>新しいデプロイ</b><br>
+    開いたタブの右上 <b>デプロイ</b><span class="arrow">▸</span><b>新しいデプロイ</b><br>
     種類を選択（⚙）<span class="arrow">▸</span><b>ウェブアプリ</b><br>
     <span class="arrow">▸</span><b>デプロイ</b>
   </div>
+  <div class="hint"><b>この画面は開いたままで大丈夫です。</b>
+    デプロイが終わったらこの表のタブに戻って、そのまま次へ進んでください。</div>
   <div class="hint">
     <b>「次のユーザーとして実行：自分」「アクセスできるユーザー：全員」は、
     はじめから入っているはずです。</b>そのままで大丈夫です。<br>
@@ -144,9 +155,11 @@
     （次の画面で確かめます）。
   </div>
   <div class="warn">
-    <b>「このアプリは確認されていません」</b>と出ることがあります。<br>
-    ご自身で作ったものを、ご自身で許可するだけです。Googleの審査は要りません。<br>
-    「詳細」→「（プロジェクト名）に移動」→「許可」と進んでください。
+    <b>「このアプリは Google で確認されていません」</b>と出たら、次の順に進んでください。<br>
+    ① 左下の <b>詳細</b><br>
+    ② <b>「（プロジェクト名）に移動（安全ではないページ）」</b><br>
+    ③ <b>許可</b><br>
+    ご自身で作った表を、ご自身で許可しているだけです。Googleの審査は、たくさんの人に配るアプリのためのもので、個人の表には要りません。
   </div>
   <div class="nav">
     <button class="btn sub" type="button" data-prev>もどる</button>
@@ -187,6 +200,14 @@
     </div>
   </div>
 
+  <!-- URLとキーを手で写させない。押すとドロッパーが開いて設定が入る。 -->
+  <p style="margin-top:14px">
+    <button class="btn wide" type="button" id="regDropper">イベントドロッパーに登録する ↗</button>
+  </p>
+  <p class="msg" id="regMsg"></p>
+  <div class="hint">押すと新しいタブでイベントドロッパーが開き、上のURLと書き込みキーが
+    そのまま入ります。貼り付ける手間はありません。</div>
+
   <div class="hint">名簿を直したいときは、いつでもメニュー「出欠システム → セットアップを開く」から。
     イベントは「イベント」シートに増えていきます。</div>
   <div class="nav">
@@ -198,6 +219,11 @@
 <script>
 (function () {
   'use strict';
+
+  /* 完成画面の「イベントドロッパーに登録する」の飛び先。
+     attendance-api.gs の ATTEND_BASE と同じ公開先をさす（あちらは /attend/、こちらは /calendar/）。
+     公開先を変えるときは両方そろえること。 */
+  var DROPPER_BASE = 'https://app.dropper-tools.com/calendar/';
 
   var steps = [].slice.call(document.querySelectorAll('[data-step]'));
   var dots = null;
@@ -238,6 +264,9 @@
     if (s.members && s.members.length) renderMembers(s.members);
     // 設定ずみなら最後の画面から開く（名簿の手直しで開く人が多いため）
     if (s.deployId && s.links) { paintDone(); show(4); }
+    // 名簿まで済んでデプロイがまだなら、その続きから。ステップ1に戻すと
+    // 保存ずみなのに3画面クリックし直すことになる（実際に詰まった箇所）。
+    else if (s.org && s.members && s.members.length) show(2);
     else show(0);
   }).withFailureHandler(function (e) {
     document.body.innerHTML = '<div class="step"><h2>開けませんでした</h2><p class="msg ng">'
@@ -386,6 +415,23 @@
       .setupSaveDeploy(v);
   });
 
+  /* ---------- 3. Apps Script を開く ---------- */
+  document.getElementById('openScript').addEventListener('click', function () {
+    var m = document.getElementById('scriptMsg');
+    var btn = this;
+    btn.disabled = true;
+    msg(m, '', '開いています…');
+    google.script.run.withSuccessHandler(function (r) {
+      btn.disabled = false;
+      if (!r || !r.url) { msg(m, 'ng', '開けませんでした。上のメニュー「拡張機能 → Apps Script」から開いてください。'); return; }
+      msg(m, '', '');
+      window.open(r.url, '_blank');
+    }).withFailureHandler(function (e) {
+      btn.disabled = false;
+      msg(m, 'ng', '開けませんでした。上のメニュー「拡張機能 → Apps Script」から開いてください。');
+    }).setupScriptUrl();
+  });
+
   /* ---------- 5. 完成 ---------- */
   function paintDone() {
     document.getElementById('doneOrg').textContent = state.org || '';
@@ -414,6 +460,26 @@
     var old = b.textContent;
     b.textContent = 'コピーしました';
     setTimeout(function () { b.textContent = old; }, 1500);
+  });
+
+  /* ---------- 5. ドロッパーへ1クリックで登録 ---------- */
+  // URLとキーを手で写させないため、設定を # のうしろに載せて渡す。
+  // # はサーバーに送られず、受け側（calendar/app.js）が読んだ直後にアドレス欄から消す。
+  // 符号化は attendance-hook.js の b64url_ と同じ方式。変えるときは両方そろえること。
+  function b64url(str) {
+    return btoa(unescape(encodeURIComponent(str)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  document.getElementById('regDropper').addEventListener('click', function () {
+    var m = document.getElementById('regMsg');
+    if (!state.deployId || !state.writeKey) {
+      msg(m, 'ng', '先にステップ4でURLを保存してください。');
+      return;
+    }
+    var token = b64url(JSON.stringify({ d: state.deployId, k: state.writeKey }));
+    window.open(DROPPER_BASE + '#attend=' + token, '_blank');
+    msg(m, 'ok', '✓ 新しいタブで開きました。「つながりました」と出れば登録できています。');
   });
 
   document.getElementById('closeBtn').addEventListener('click', function () {
