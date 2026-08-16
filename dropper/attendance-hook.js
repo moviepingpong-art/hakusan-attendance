@@ -28,16 +28,33 @@ var AttendanceHook = (function () {
   var LABEL = '🙋 出欠を回答する';
   var TIMEOUT_MS = 25000;
 
-  function lsGet(k) { try { return window.localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  // localStorage が使えない端末（iOS Safariの「サイト超えトラッキングを防ぐ」、
+  // プライベートブラウズ、Cookieのブロック等）のための控え。この読み込みのあいだだけ覚える。
+  // これがないと、そういう端末では設定が持てず「出欠を作る」が一切押せなくなり、
+  // 主催者にブラウザ設定の変更を強いることになる。開き直せば消えるので、その都度貼り直してもらう。
+  var mem = {};
+
+  function lsGet(k) {
+    try {
+      var v = window.localStorage.getItem(k);
+      if (v) return v;
+    } catch (e) { /* 使えない端末なので控えを見る */ }
+    return mem[k] || '';
+  }
   // 書いたあと読み直して確かめる。プライベートブラウズやCookieのブロック下では
   // setItem が例外を投げず、黙って捨てられることがあるため（保存できたと誤認させない）。
+  // 戻り値は「次に開いても残るか」。false でも控えには入っているので、今回の操作は続けられる。
   function lsSet(k, v) {
+    mem[k] = v;
     try {
       window.localStorage.setItem(k, v);
       return window.localStorage.getItem(k) === v;
     } catch (e) { return false; }
   }
-  function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) { /* noop */ } }
+  function lsDel(k) {
+    delete mem[k];
+    try { window.localStorage.removeItem(k); } catch (e) { /* noop */ }
+  }
 
   function parseDeployId(raw) {
     var s = String(raw == null ? '' : raw).trim();
@@ -106,7 +123,10 @@ var AttendanceHook = (function () {
       if (!res.keyOk) throw new Error('書き込みキーが違います。スプレッドシートの「設定」シートB2をご確認ください。');
       // 保存できたかは呼び出し側に返す。黙って握りつぶすと「✓ つながりました」と出たのに
       // 次に開くと設定が消えている、という分かりにくい状態になる（2026-08-16の実機で発生）。
-      var stored = lsSet(STORE.deployId, deployId) && lsSet(STORE.writeKey, writeKey);
+      // && で繋ぐと左が false のとき右が呼ばれず、キーが控えにも入らない。必ず両方書く。
+      var idStored = lsSet(STORE.deployId, deployId);
+      var keyStored = lsSet(STORE.writeKey, writeKey);
+      var stored = idStored && keyStored;
       lsSet(STORE.org, res.org || '');
       return { org: res.org || '', deployId: deployId, stored: stored };
     });
