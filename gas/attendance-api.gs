@@ -637,14 +637,25 @@ function 初期設定() {
     .setFontSize(24).setFontWeight('bold').setFontColor('#1769b0');
   intro.getRange('A2').setValue('上のメニュー「出欠システム」→「セットアップを開く」を押してください。')
     .setFontSize(16).setFontWeight('bold');
+  // 承認は、こちらの画面が出るより前に起きる。だから事前に読ませられるのはこのシートだけ。
+  // 「安全ではないページ」という強い言葉で引き返す人が実際にいたので、画面名どおりに順を追う。
   intro.getRange('A3').setValue(
     '\n団体名とメンバーのお名前を入れるところから、みなさんに配るURLができあがるまで、'
     + '画面が順番にご案内します。\n\n'
-    + '※ はじめて開いたときは「承認が必要です」と出ます。ご自身で作った表なので、'
-    + 'ご自身のアカウントを選んで許可してください。\n'
+    + '━━━ はじめて押したときだけ、許可を求められます ━━━\n\n'
+    + 'おどろかせる画面が出ますが、順番どおりに進めば大丈夫です。\n\n'
+    + '　① 「承認が必要です」→ 続行\n'
+    + '　② ご自身のGoogleアカウントを選ぶ\n'
+    + '　③ 「このアプリは Google で確認されていません」→ 左下の 詳細 をクリック\n'
+    + '　④ 「（プロジェクト名）に移動（安全ではないページ）」をクリック\n'
+    + '　⑤ 「許可」\n\n'
+    + '【なぜこう出るのか】この表はあなた自身のものです。中の仕組みもあなたの表の中だけで動きます。'
+    + 'Googleの審査は、たくさんの人に配るアプリのためのもので、個人の表には要りません。'
+    + 'ご自身で作った表を、ご自身で許可しているだけです。\n'
+    + '出欠のデータはあなたのGoogleドライブから外に出ませんし、作った人にも渡りません。\n\n'
     + '※ このシートは消してかまいません。');
   intro.getRange('A3').setWrap(true).setFontSize(13).setFontColor('#5a6b7b');
-  intro.setRowHeight(3, 130);
+  intro.setRowHeight(3, 330);
   ss.setActiveSheet(intro);
 
   ensure(SH.MEMBERS, ['名前', '性別（男／女）', '備考'], [160, 130, 240]);
@@ -741,11 +752,24 @@ function newWriteKey_() {
  *  画面側は setup-ui.html。呼び出しは google.script.run 経由。
  * ========================================================== */
 
+/**
+ * セットアップ画面を出す。**モーダルにしないこと。**
+ *
+ * showModalDialog は表の操作を全部塞ぐ。ステップ3で「拡張機能 → Apps Script」を
+ * 開いてもらう必要があるのに、モーダルだとそのメニューが押せず、いったん閉じるしかない。
+ * しかも閉じて開き直すとステップ1に戻る。実際に他団体として通してみて詰まった箇所そのもの。
+ * サイドバーなら表の操作を塞がないので、開いたままデプロイしに行って戻れる。
+ */
 function セットアップを開く() {
   ensureSheets_();
   var html = HtmlService.createHtmlOutputFromFile('setup-ui')
-    .setWidth(680).setHeight(660);
-  SpreadsheetApp.getUi().showModalDialog(html, '出欠システムのセットアップ');
+    .setTitle('出欠システムのセットアップ');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+/** ステップ3から Apps Script のエディタを直接開くため（メニューを探させない） */
+function setupScriptUrl() {
+  return { ok: true, url: 'https://script.google.com/home/projects/' + ScriptApp.getScriptId() + '/edit' };
 }
 
 /** シートが無ければ黙って作る（セットアップ画面から先に入った人のため） */
