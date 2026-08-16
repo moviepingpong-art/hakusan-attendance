@@ -1,12 +1,17 @@
 /* 出欠ドロッパー連携フック v1.0
    イベントドロッパー（dropper-app の calendar/）に読み込ませて使う小さなモジュール。
-   calendar/app.js からは下の5つだけを呼べば足りるようにしてある。
+   calendar/app.js からは下のものを呼べば足りるようにしてある。
 
      AttendanceHook.configured()            出欠システムが設定ずみか
      AttendanceHook.saveSettings({...})     設定欄からの保存（疎通とキーの確認つき）
      AttendanceHook.createEvent({...})      「出欠を作る」ボタン
      AttendanceHook.linkFor(eventId)        出欠ページのURL
      AttendanceHook.announcementLine(id)    案内文に足す2行
+
+   設定を覚えられない端末むけ（ブックマークから1タップで戻す）：
+
+     AttendanceHook.settingsLink()          設定を載せたリンクを作る
+     AttendanceHook.consumeSettingsHash()   リンクから設定を取り込み、アドレス欄から消す
 
    組み込み手順は docs/dropper-integration.md を参照。
    parser.js は触らないこと。
@@ -188,6 +193,61 @@ var AttendanceHook = (function () {
     return announcementLine(eventId).length;
   }
 
+  /* ===== 設定を持ち歩くためのリンク =====
+     設定を覚えられない端末（iOS Safariの「サイト超えトラッキングを防ぐ」等）のために、
+     設定をURLの # のうしろに載せて、ブックマークから1タップで戻せるようにする。
+     # のうしろはサーバーに送られないので、書き込みキーが通信に乗ることはない。
+     ただしブックマークと履歴には残る。人に渡さないよう、UI側で必ず警告すること。 */
+
+  function b64url_(s) {
+    return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function unb64url_(s) {
+    var t = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
+    while (t.length % 4) t += '=';
+    return decodeURIComponent(escape(atob(t)));
+  }
+
+  /** いまの設定を載せたリンク。未設定なら空を返す */
+  function settingsLink(baseUrl) {
+    var s = settings();
+    if (!s.deployId || !s.writeKey) return '';
+    var base = String(baseUrl || (window.location.origin + window.location.pathname));
+    return base.split('#')[0] + '#attend=' + b64url_(JSON.stringify({ d: s.deployId, k: s.writeKey }));
+  }
+
+  /** リンクの # のうしろから設定を取り出す。読めなければ null */
+  function readSettingsHash(hash) {
+    var h = String(hash == null ? window.location.hash : hash);
+    var m = h.match(/[#&]attend=([A-Za-z0-9_-]+)/);
+    if (!m) return null;
+    try {
+      var o = JSON.parse(unb64url_(m[1]));
+      var deployId = parseDeployId(o && o.d);
+      var writeKey = String((o && o.k) || '').trim();
+      return (deployId && writeKey) ? { deployId: deployId, writeKey: writeKey } : null;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * リンクに載っていた設定を取り込む。中身はsaveSettingsが疎通とキーまで確かめる。
+   * 取り込めても取り込めなくても、アドレス欄からは必ず消す（キーを残したままにしない）。
+   */
+  function consumeSettingsHash() {
+    var got = readSettingsHash();
+    if (!got) return null;
+    stripHash_();
+    return saveSettings(got);
+  }
+
+  function stripHash_() {
+    try {
+      var clean = window.location.pathname + window.location.search;
+      if (window.history && window.history.replaceState) window.history.replaceState(null, '', clean);
+      else window.location.hash = '';
+    } catch (e) { /* 消せなくても続行する */ }
+  }
+
   return {
     ATTEND_BASE: ATTEND_BASE,
     STORE: STORE,
@@ -201,7 +261,10 @@ var AttendanceHook = (function () {
     linkFor: linkFor,
     announcementLine: announcementLine,
     lineLength: lineLength,
-    parseDeployId: parseDeployId
+    parseDeployId: parseDeployId,
+    settingsLink: settingsLink,              // 設定を載せたリンクを作る（ブックマーク用）
+    readSettingsHash: readSettingsHash,      // リンクから設定を読む（取り込みはしない）
+    consumeSettingsHash: consumeSettingsHash // リンクから読んで取り込み、アドレス欄から消す
   };
 })();
 
