@@ -662,6 +662,54 @@ function 初期設定() {
   );
 }
 
+/**
+ * 配布用テンプレートを作るための後始末。**Apps Script のエディタから手で実行する。**
+ *
+ * メニューには出さない。運用中の表で誤って押されると、名簿も回答も消えてしまうため
+ * （主催者の目に触れる場所に置かない、というのがここでの安全策）。
+ *
+ * 団体名・名簿・イベント・回答・紐付け・集計を空にし、書き込みキーを作り直す。
+ * 済んだら「共有 → リンクを知っている全員／閲覧者」にして、URLの末尾を /copy に
+ * 変えたものを attend/attend.js の TEMPLATE_COPY_URL に入れる。
+ */
+function 配布用に空にする() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = ss_();
+  var targets = [SH.MEMBERS, SH.EVENTS, SH.ANSWERS, SH.LINKS];
+
+  var counts = targets.map(function (n) { return '・' + n + '　' + rows_(n).length + '行'; }).join('\n');
+  var org = String(sheet_(SH.CONFIG).getRange('B1').getValue() || '（未設定）');
+
+  var ans = ui.alert('配布用テンプレートにします',
+    '団体名「' + org + '」のデータを、この表からすべて消します。\n'
+    + '運用中の表では絶対に実行しないでください。\n\n'
+    + counts + '\n・集計シート\n・団体名／デプロイID\n\n'
+    + '書き込みキーも作り直します。消してよろしいですか？',
+    ui.ButtonSet.YES_NO);
+  if (ans !== ui.Button.YES) return;
+
+  // 見出し行と書式は残したいので、clear() ではなく2行目以降を削る
+  targets.forEach(function (name) {
+    var sh = sheet_(name);
+    var last = sh.getLastRow();
+    if (last > 1) sh.deleteRows(2, last - 1);
+  });
+  sheet_(SH.TALLY).clear();   // 集計は見出しを持たないので丸ごと
+
+  var conf = sheet_(SH.CONFIG);
+  conf.getRange('B1').setValue('');               // 団体名
+  conf.getRange('B2').setValue(newWriteKey_());   // 配布元のキーを持ち出させない
+  conf.getRange('B4').setValue('');               // デプロイID
+  conf.getRange('B5').setValue(ss.getId());
+
+  var intro = ss.getSheetByName(SH.INTRO);
+  if (intro) ss.setActiveSheet(intro);            // コピーした人が最初に見る場所へ戻す
+
+  ui.alert('空にしました。\n\n'
+    + 'このあと「共有」→「リンクを知っている全員」→「閲覧者」にして、\n'
+    + 'URLの末尾（/edit… の部分）を /copy に変えたものを配布用にお使いください。');
+}
+
 function 書き込みキーを表示() {
   var key = cfg_().key || '（未設定です。初期設定を実行してください）';
   SpreadsheetApp.getUi().alert('書き込みキー\n\n' + key + '\n\nカレンダードロッパーの設定欄に貼り付けてください。人には見せないでください。');
