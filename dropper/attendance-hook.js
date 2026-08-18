@@ -1,270 +1,69 @@
-/* 出欠ドロッパー連携フック v1.0
+/* 出欠ドロッパー連携フック v2.0
    イベントドロッパー（dropper-app の calendar/）に読み込ませて使う小さなモジュール。
-   calendar/app.js からは下のものを呼べば足りるようにしてある。
 
-     AttendanceHook.configured()            出欠システムが設定ずみか
-     AttendanceHook.saveSettings({...})     設定欄からの保存（疎通とキーの確認つき）
-     AttendanceHook.createEvent({...})      「出欠を作る」ボタン
-     AttendanceHook.linkFor(eventId)        出欠ページのURL
-     AttendanceHook.announcementLine(id)    案内文に足す2行
+     AttendanceHook.saveToken(ev)   読み取った内容を、貼り付け用の文字列にする
+     AttendanceHook.available()     使える状態か（この版では常に true）
 
-   設定を覚えられない端末むけ（ブックマークから1タップで戻す）：
+   ★v2 でやめたこと
+   主催者の表への書き込みをやめた。以前は書き込みキーを端末に保存して
+   GASへPOSTしていたが、そのために
 
-     AttendanceHook.settingsLink()          設定を載せたリンクを作る
-     AttendanceHook.consumeSettingsHash()   リンクから設定を取り込み、アドレス欄から消す
+     ・出欠システムの設定モーダル（URL＋書き込みキー）
+     ・端末ごとの設定保存と、iOS Safari の「サイト超えトラッキングを防ぐ」対策
+     ・PCとスマホで別々に設定する運用
 
-   組み込み手順は docs/dropper-integration.md を参照。
+   が必要だった。読み取った内容をクリップボードに載せて主催者に渡し、
+   表のサイドバーで取り込む形にしたので、これらがまとめて要らなくなった。
+   **このファイルは通信も保存も一切しない。**
+
+   取り込む側は gas/attendance-api.gs の importTaikai。
+   符号化の形を変えるときは必ず両方そろえること。
    parser.js は触らないこと。
 */
 var AttendanceHook = (function () {
   'use strict';
 
-  /* ===== 公開先に合わせてここだけ変える ===== */
-  var ATTEND_BASE = 'https://app.dropper-tools.com/attend/';
-  /* ========================================= */
+  function available() { return true; }
 
-  // attend/attend.js と同じキーを使う（setup.html で保存した値をそのまま拾う）
-  var STORE = {
-    deployId: 'dropper.attend.deployId',
-    writeKey: 'dropper.attend.writeKey',
-    org:      'dropper.attend.org'
-  };
-
-  var LABEL = '🙋 出欠を回答する';
-  var TIMEOUT_MS = 25000;
-
-  // localStorage が使えない端末（iOS Safariの「サイト超えトラッキングを防ぐ」、
-  // プライベートブラウズ、Cookieのブロック等）のための控え。この読み込みのあいだだけ覚える。
-  // これがないと、そういう端末では設定が持てず「出欠を作る」が一切押せなくなり、
-  // 主催者にブラウザ設定の変更を強いることになる。開き直せば消えるので、その都度貼り直してもらう。
-  var mem = {};
-
-  function lsGet(k) {
-    try {
-      var v = window.localStorage.getItem(k);
-      if (v) return v;
-    } catch (e) { /* 使えない端末なので控えを見る */ }
-    return mem[k] || '';
-  }
-  // 書いたあと読み直して確かめる。プライベートブラウズやCookieのブロック下では
-  // setItem が例外を投げず、黙って捨てられることがあるため（保存できたと誤認させない）。
-  // 戻り値は「次に開いても残るか」。false でも控えには入っているので、今回の操作は続けられる。
-  function lsSet(k, v) {
-    mem[k] = v;
-    try {
-      window.localStorage.setItem(k, v);
-      return window.localStorage.getItem(k) === v;
-    } catch (e) { return false; }
-  }
-  function lsDel(k) {
-    delete mem[k];
-    try { window.localStorage.removeItem(k); } catch (e) { /* noop */ }
-  }
-
-  function parseDeployId(raw) {
-    var s = String(raw == null ? '' : raw).trim();
-    if (!s) return '';
-    var m = s.match(/\/macros\/s\/([A-Za-z0-9_-]+)/);
-    if (m) return m[1];
-    return /^[A-Za-z0-9_-]{20,200}$/.test(s) ? s : '';
-  }
-
-  function settings() {
-    return {
-      deployId: lsGet(STORE.deployId),
-      writeKey: lsGet(STORE.writeKey),
-      org:      lsGet(STORE.org)
-    };
-  }
-
-  function configured() {
-    var s = settings();
-    return !!(s.deployId && s.writeKey);
-  }
-
-  function clear() {
-    lsDel(STORE.deployId); lsDel(STORE.writeKey); lsDel(STORE.org);
-  }
-
-  function apiUrl(deployId) {
-    var id = parseDeployId(deployId);
-    return id ? 'https://script.google.com/macros/s/' + id + '/exec' : '';
-  }
-
-  function call(deployId, body) {
-    var url = apiUrl(deployId);
-    if (!url) return Promise.reject(new Error('出欠システムのURLが正しくありません。'));
-
-    var ctrl = window.AbortController ? new AbortController() : null;
-    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, TIMEOUT_MS) : null;
-    var opt = { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) };
-    if (ctrl) opt.signal = ctrl.signal;
-
-    return fetch(url, opt)
-      .then(function (res) { return res.text(); })
-      .then(function (t) {
-        if (timer) clearTimeout(timer);
-        var data;
-        try { data = JSON.parse(t); }
-        catch (e) { throw new Error('出欠システムに接続できませんでした（アクセス権が「全員」か確認してください）。'); }
-        if (!data || data.ok !== true) throw new Error((data && data.error) || '出欠システムでエラーが起きました。');
-        return data;
-      })
-      .catch(function (err) {
-        if (timer) clearTimeout(timer);
-        if (err && err.name === 'AbortError') throw new Error('出欠システムへの接続がタイムアウトしました。');
-        throw err;
-      });
-  }
-
-  /** 設定欄からの保存。URLとキーの両方をその場で確かめてから保存する */
-  function saveSettings(input) {
-    var deployId = parseDeployId(input && input.deployId);
-    var writeKey = String((input && input.writeKey) || '').trim();
-    if (!deployId) return Promise.reject(new Error('出欠システムのURLを、/exec で終わる形のまま貼り付けてください。'));
-    if (!writeKey) return Promise.reject(new Error('書き込みキーを入れてください。'));
-
-    return call(deployId, { action: 'checkKey', key: writeKey }).then(function (res) {
-      if (!res.keyOk) throw new Error('書き込みキーが違います。スプレッドシートの「設定」シートB2をご確認ください。');
-      // 保存できたかは呼び出し側に返す。黙って握りつぶすと「✓ つながりました」と出たのに
-      // 次に開くと設定が消えている、という分かりにくい状態になる（2026-08-16の実機で発生）。
-      // && で繋ぐと左が false のとき右が呼ばれず、キーが控えにも入らない。必ず両方書く。
-      var idStored = lsSet(STORE.deployId, deployId);
-      var keyStored = lsSet(STORE.writeKey, writeKey);
-      var stored = idStored && keyStored;
-      lsSet(STORE.org, res.org || '');
-      return { org: res.org || '', deployId: deployId, stored: stored };
-    });
-  }
-
-  /**
-   * 出欠のイベントを作る。
-   * @param {{name:string, date?:string|Date, deadline?:string|Date, items?:string|string[], youkou?:string}} ev
-   * @returns {Promise<{eventId:string, url:string, existing:boolean, org:string}>}
-   *
-   * 同じ名前・同じ開催日のイベントがすでにあるときはGAS側が作り足さず、
-   * もとのIDを existing:true で返す（要項の二度ドロップでカレンダー予定が重なる事故と同じ轍を踏まないため）。
-   */
-  function createEvent(ev) {
-    var s = settings();
-    if (!s.deployId || !s.writeKey) {
-      return Promise.reject(new Error('先に設定欄で出欠システムのURLと書き込みキーを登録してください。'));
-    }
-    var name = String((ev && ev.name) || '').trim();
-    if (!name) return Promise.reject(new Error('大会名が読み取れていません。'));
-
-    return call(s.deployId, {
-      action: 'createEvent',
-      key: s.writeKey,
-      name: name,
-      date: toPlain(ev.date),
-      deadline: toPlain(ev.deadline),
-      items: ev.items || '',
-      youkou: ev.youkou || ''
-    }).then(function (res) {
-      if (res.org) lsSet(STORE.org, res.org);
-      return { eventId: res.eventId, url: linkFor(res.eventId), existing: !!res.existing, org: res.org || '' };
-    });
+  function b64url_(str) {
+    return btoa(unescape(encodeURIComponent(str)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
   function toPlain(v) {
     if (!v) return '';
-    if (v instanceof Date) {
-      return v.getFullYear() + '/' + (v.getMonth() + 1) + '/' + v.getDate();
-    }
+    if (v instanceof Date) return v.getFullYear() + '/' + (v.getMonth() + 1) + '/' + v.getDate();
     return String(v).trim();
   }
 
-  /** 出欠ページのURL。全体で125字前後に収まるので、LINEでもリンク化される */
-  function linkFor(eventId) {
-    var s = settings();
-    if (!s.deployId || !eventId) return '';
-    return ATTEND_BASE + '?s=' + encodeURIComponent(s.deployId) + '&e=' + encodeURIComponent(eventId);
-  }
-
-  /** 案内文に足す2行。add/ の中継ページ（annRedirect_）は通さないこと */
-  function announcementLine(eventId) {
-    var url = linkFor(eventId);
-    return url ? LABEL + '\n' + url : '';
-  }
-
-  /** X（旧Twitter）用：140字などの枠に収まるかを見て、収まらなければ呼び出し側で他の行を落とす */
-  function lineLength(eventId) {
-    return announcementLine(eventId).length;
-  }
-
-  /* ===== 設定を持ち歩くためのリンク =====
-     設定を覚えられない端末（iOS Safariの「サイト超えトラッキングを防ぐ」等）のために、
-     設定をURLの # のうしろに載せて、ブックマークから1タップで戻せるようにする。
-     # のうしろはサーバーに送られないので、書き込みキーが通信に乗ることはない。
-     ただしブックマークと履歴には残る。人に渡さないよう、UI側で必ず警告すること。 */
-
-  function b64url_(s) {
-    return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-  function unb64url_(s) {
-    var t = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
-    while (t.length % 4) t += '=';
-    return decodeURIComponent(escape(atob(t)));
-  }
-
-  /** いまの設定を載せたリンク。未設定なら空を返す */
-  function settingsLink(baseUrl) {
-    var s = settings();
-    if (!s.deployId || !s.writeKey) return '';
-    var base = String(baseUrl || (window.location.origin + window.location.pathname));
-    return base.split('#')[0] + '#attend=' + b64url_(JSON.stringify({ d: s.deployId, k: s.writeKey }));
-  }
-
-  /** リンクの # のうしろから設定を取り出す。読めなければ null */
-  function readSettingsHash(hash) {
-    var h = String(hash == null ? window.location.hash : hash);
-    var m = h.match(/[#&]attend=([A-Za-z0-9_-]+)/);
-    if (!m) return null;
-    try {
-      var o = JSON.parse(unb64url_(m[1]));
-      var deployId = parseDeployId(o && o.d);
-      var writeKey = String((o && o.k) || '').trim();
-      return (deployId && writeKey) ? { deployId: deployId, writeKey: writeKey } : null;
-    } catch (e) { return null; }
-  }
-
   /**
-   * リンクに載っていた設定を取り込む。中身はsaveSettingsが疎通とキーまで確かめる。
-   * 取り込めても取り込めなくても、アドレス欄からは必ず消す（キーを残したままにしない）。
+   * 読み取った内容を、表に貼り付ける文字列にする。
+   * @param {{name:string, date?:string|Date, deadline?:string|Date, place?:string,
+   *          items?:string|string[], youkou?:string, detail?:Object}} ev
+   * @returns {string} 貼り付け用の文字列。名前が無ければ空
    */
-  function consumeSettingsHash() {
-    var got = readSettingsHash();
-    if (!got) return null;
-    stripHash_();
-    return saveSettings(got);
-  }
+  function saveToken(ev) {
+    var name = String((ev && ev.name) || '').trim();
+    if (!name) return '';
 
-  function stripHash_() {
-    try {
-      var clean = window.location.pathname + window.location.search;
-      if (window.history && window.history.replaceState) window.history.replaceState(null, '', clean);
-      else window.location.hash = '';
-    } catch (e) { /* 消せなくても続行する */ }
+    var items = Array.isArray(ev.items)
+      ? ev.items.map(function (s) { return String(s).trim(); }).filter(String)
+      : String(ev.items || '').split(/[、,，\n\/／]+/).map(function (s) { return s.trim(); }).filter(String);
+
+    return b64url_(JSON.stringify({
+      name: name,
+      date: toPlain(ev.date),
+      deadline: toPlain(ev.deadline),
+      place: String((ev && ev.place) || '').trim(),
+      items: items,
+      youkou: String((ev && ev.youkou) || '').trim(),
+      detail: (ev && ev.detail) || null
+    }));
   }
 
   return {
-    ATTEND_BASE: ATTEND_BASE,
-    STORE: STORE,
-    LABEL: LABEL,
-    settings: settings,
-    configured: configured,
-    clear: clear,
-    apiUrlOf: apiUrl,          // 設定欄に「…/exec」の形で戻して見せるため
-    saveSettings: saveSettings,
-    createEvent: createEvent,
-    linkFor: linkFor,
-    announcementLine: announcementLine,
-    lineLength: lineLength,
-    parseDeployId: parseDeployId,
-    settingsLink: settingsLink,              // 設定を載せたリンクを作る（ブックマーク用）
-    readSettingsHash: readSettingsHash,      // リンクから設定を読む（取り込みはしない）
-    consumeSettingsHash: consumeSettingsHash // リンクから読んで取り込み、アドレス欄から消す
+    available: available,
+    saveToken: saveToken
   };
 })();
 
