@@ -78,6 +78,11 @@ header p{margin:4px 0 0; font-size:13px; opacity:.9; min-height:1.1em;}
 }
 .st-done{color:var(--maru); background:var(--maru-bg);}
 .st-part{color:var(--sankaku); background:var(--sankaku-bg);}
+.st-none{color:var(--batsu); background:var(--batsu-bg);}
+/* 一覧モードの1件。「回答する」を押して個別画面へ進む */
+.evcard{padding-bottom:14px;}
+.evrow{margin-top:10px;}
+.evgo{font-weight:700;}
 
 .youkou-link{
   display:inline-block; margin-top:10px; padding:9px 16px;
