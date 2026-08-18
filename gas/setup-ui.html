@@ -12,6 +12,8 @@
     --ok:#1a8f4c; --ok-bg:#e3f4ea; --ng:#c0392b; --ng-bg:#fbe7e4; --warn-bg:#fbf3df; --warn:#b8860b;
   }
   *{box-sizing:border-box;}
+  /* display を持つ要素（.dots は flex）は hidden 属性だけでは隠れない。まとめて効かせる */
+  [hidden]{display:none !important;}
   body{
     margin:0; padding:0 0 16px; color:var(--ink); background:#fff;
     font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
@@ -86,6 +88,23 @@
   .key{background:var(--ng-bg); border:1px solid #f0b9b2; border-radius:9px; padding:12px; margin:16px 0 0;}
   .key .t{font-weight:700; font-size:13.5px; margin:0 0 6px;}
 
+  /* 行事の画面。300px幅なので、1件を縦に積んで読ませる */
+  textarea{width:100%; padding:10px; font-size:13px; border:2px solid var(--line);
+    border-radius:9px; font-family:inherit; resize:vertical;}
+  textarea:focus{border-color:var(--brand); outline:none;}
+  .paste{background:#f3f6f9; border-radius:10px; padding:10px 12px; margin:0 0 14px;}
+  .paste .f{margin-top:0;}
+  .tkcard{border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:0 0 9px;}
+  .tkcard .n{font-weight:700; font-size:14.5px; line-height:1.4;}
+  .tkcard .m{font-size:12.5px; color:var(--sub); margin:3px 0 0;}
+  .tkcard .b{display:inline-block; font-size:11.5px; font-weight:700; border-radius:999px;
+    padding:3px 10px; margin:7px 0 0;}
+  .tkcard .b.no{background:#eef3f7; color:var(--sub);}
+  .tkcard .b.yes{background:var(--ok-bg); color:var(--ok);}
+  .tkcard .btn{margin:8px 0 0; padding:9px 14px; font-size:13.5px;}
+  .tkmore{font-size:12px; color:var(--sub); text-align:center; margin:2px 0 10px;}
+  .tkempty{background:#f3f6f9; border-radius:10px; padding:14px 12px; font-size:13.5px;
+    color:var(--sub); text-align:center; margin:0 0 10px;}
   .center{text-align:center;}
   .done{font-size:40px; text-align:center; margin:6px 0 0;}
   .spin{display:inline-block; width:15px; height:15px; border:2px solid var(--line);
@@ -97,6 +116,41 @@
 
 <div class="dots" id="dots"></div>
 <p class="stepno" id="stepno"></p>
+
+<!-- 行事：ふだん使う画面。セットアップが済んでいる表では、ここから開く。
+     data-step を付けないこと（付けるとステップの丸と番号に混ざる）。 -->
+<section class="step" id="taikaiScreen" hidden>
+  <h2><span class="num">🙋</span>行事から出欠を作る</h2>
+
+  <div class="paste">
+    <label class="f" for="tkPaste">イベントドロッパーで「出欠システムに保存」を押したら、ここに貼り付け</label>
+    <textarea id="tkPaste" rows="3" placeholder="コピーした内容をそのまま貼り付けてください"></textarea>
+    <p><button class="btn wide" type="button" id="tkImport">貼り付けて取り込む</button></p>
+    <p class="msg" id="tkMsg"></p>
+  </div>
+
+  <div id="tkList"></div>
+  <p class="tkmore" id="tkMore" hidden></p>
+
+  <p><button class="btn sub wide" type="button" id="tkManualOpen">＋ 手で入力して追加</button></p>
+  <div id="tkManual" hidden>
+    <label class="f" for="tkName">行事名</label>
+    <input type="text" id="tkName" placeholder="例：第30回 白山オープン大会" maxlength="80">
+    <label class="f" for="tkDate">開催日</label>
+    <input type="text" id="tkDate" placeholder="2026/9/5">
+    <label class="f" for="tkDead">申込締切</label>
+    <input type="text" id="tkDead" placeholder="2026/8/23">
+    <label class="f" for="tkItems">種目（、で区切る）</label>
+    <input type="text" id="tkItems" placeholder="シングルス、ダブルス">
+    <p><button class="btn wide" type="button" id="tkAdd">追加する</button></p>
+    <p class="msg" id="tkAddMsg"></p>
+  </div>
+
+  <div class="nav">
+    <button class="btn sub" type="button" id="tkToDone">配るURLを見る</button>
+    <button class="btn sub" type="button" id="tkToSetup">団体名・名簿を直す</button>
+  </div>
+</section>
 
 <!-- 1. 団体名 -->
 <section class="step" data-step hidden>
@@ -212,7 +266,8 @@
     イベントは「イベント」シートに増えていきます。</div>
   <div class="nav">
     <button class="btn sub" type="button" data-prev>もどる</button>
-    <button class="btn" type="button" id="closeBtn">閉じる</button>
+    <button class="btn" type="button" id="doneToTaikai">行事の画面へ</button>
+    <button class="btn sub" type="button" id="closeBtn">閉じる</button>
   </div>
 </section>
 
@@ -234,12 +289,27 @@
   document.getElementById('dots').innerHTML = steps.map(function () { return '<i></i>'; }).join('');
   dots = [].slice.call(document.querySelectorAll('#dots i'));
 
+  var $taikai = document.getElementById('taikaiScreen');
+
   function show(i) {
+    $taikai.hidden = true;
+    document.getElementById('dots').hidden = false;
+    document.getElementById('stepno').hidden = false;
     cur = Math.max(0, Math.min(steps.length - 1, i));
     steps.forEach(function (s, n) { s.hidden = (n !== cur); });
     dots.forEach(function (d, n) { d.className = n === cur ? 'on' : (n < cur ? 'past' : ''); });
     document.getElementById('stepno').textContent = (cur + 1) + ' / ' + steps.length;
     window.scrollTo(0, 0);
+  }
+
+  /** 行事の画面へ。ステップの丸と番号は隠す（セットアップの一部ではないため） */
+  function showTaikai() {
+    steps.forEach(function (s) { s.hidden = true; });
+    document.getElementById('dots').hidden = true;
+    document.getElementById('stepno').hidden = true;
+    $taikai.hidden = false;
+    window.scrollTo(0, 0);
+    loadTaikai();
   }
   document.addEventListener('click', function (e) {
     if (e.target.closest('[data-next]')) show(cur + 1);
@@ -262,8 +332,9 @@
     document.getElementById('org').value = (s.org === '出欠') ? '' : (s.org || '');
     document.getElementById('wkey').value = s.writeKey || '';
     if (s.members && s.members.length) renderMembers(s.members);
-    // 設定ずみなら最後の画面から開く（名簿の手直しで開く人が多いため）
-    if (s.deployId && s.links) { paintDone(); show(4); }
+    // 設定が済んでいれば、ふだん使う行事の画面から開く。
+    // 完成画面（配るURL）と名簿へは、そこのボタンから行ける。
+    if (s.deployId && s.links) { paintDone(); showTaikai(); }
     // 名簿まで済んでデプロイがまだなら、その続きから。ステップ1に戻すと
     // 保存ずみなのに3画面クリックし直すことになる（実際に詰まった箇所）。
     else if (s.org && s.members && s.members.length) show(2);
@@ -481,6 +552,120 @@
     window.open(DROPPER_BASE + '#attend=' + token, '_blank');
     msg(m, 'ok', '✓ 新しいタブで開きました。「つながりました」と出れば登録できています。');
   });
+
+  /* ---------- 行事 ---------- */
+  function loadTaikai() {
+    var box = document.getElementById('tkList');
+    box.innerHTML = '<p class="tkempty"><span class="spin"></span> 読み込んでいます…</p>';
+    google.script.run.withSuccessHandler(function (r) {
+      paintTaikai(r);
+    }).withFailureHandler(function (e) {
+      box.innerHTML = '<p class="tkempty">' + esc(e && e.message ? e.message : e) + '</p>';
+    }).listTaikai();
+  }
+
+  function paintTaikai(r) {
+    var box = document.getElementById('tkList');
+    var more = document.getElementById('tkMore');
+    var list = (r && r.list) || [];
+
+    if (!list.length) {
+      box.innerHTML = '<p class="tkempty">まだ行事がありません。<br>'
+        + 'イベントドロッパーで保存した内容を上に貼り付けるか、<br>下のボタンから手で入力してください。</p>';
+      more.hidden = true;
+      return;
+    }
+
+    box.innerHTML = list.map(function (t) {
+      var meta = [];
+      if (t.date) meta.push('開催 ' + t.date);
+      if (t.deadline) meta.push('締切 ' + t.deadline);
+      if (t.items && t.items.length) meta.push(t.items.join('、'));
+      var badge = t.eventId
+        ? '<span class="b yes">✓ 出欠あり</span>'
+        : '<span class="b no">未使用</span>';
+      var btn = t.eventId ? ''
+        : '<button class="btn wide" type="button" data-mk="' + esc(t.id) + '">この行事で出欠を作る</button>';
+      return '<div class="tkcard"><div class="n">' + esc(t.name) + '</div>'
+        + (meta.length ? '<div class="m">' + esc(meta.join('　/　')) + '</div>' : '')
+        + '<div>' + badge + '</div>' + btn + '</div>';
+    }).join('');
+
+    if (r.total > list.length) {
+      more.hidden = false;
+      more.textContent = '新しい' + list.length + '件を出しています（全' + r.total
+        + '件）。それ以前は「行事」シートをご覧ください。';
+    } else { more.hidden = true; }
+  }
+
+  // 「この行事で出欠を作る」。一覧は作り直すので、押されたIDで引く
+  document.getElementById('tkList').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mk]');
+    if (!b) return;
+    b.disabled = true;
+    b.textContent = '作っています…';
+    google.script.run.withSuccessHandler(function (r) {
+      if (!r.ok) { b.disabled = false; b.textContent = 'この行事で出欠を作る'; alert(r.error); return; }
+      loadTaikai();
+    }).withFailureHandler(function (err) {
+      b.disabled = false; b.textContent = 'この行事で出欠を作る';
+      alert(err && err.message ? err.message : err);
+    }).createEventFromTaikai(b.getAttribute('data-mk'), null);
+  });
+
+  document.getElementById('tkImport').addEventListener('click', function () {
+    var ta = document.getElementById('tkPaste');
+    var m = document.getElementById('tkMsg');
+    var v = (ta.value || '').trim();
+    if (!v) { msg(m, 'ng', '貼り付けてから押してください。'); return; }
+    this.disabled = true;
+    msg(m, '', '取り込んでいます…');
+    var btn = this;
+    google.script.run.withSuccessHandler(function (r) {
+      btn.disabled = false;
+      if (!r.ok) { msg(m, 'ng', r.error); return; }
+      ta.value = '';
+      msg(m, 'ok', r.existing ? '同じ行事がすでにありました：' + r.name : '✓ 取り込みました：' + r.name);
+      loadTaikai();
+    }).withFailureHandler(function (e) {
+      btn.disabled = false;
+      msg(m, 'ng', e && e.message ? e.message : e);
+    }).importTaikai(v);
+  });
+
+  document.getElementById('tkManualOpen').addEventListener('click', function () {
+    var box = document.getElementById('tkManual');
+    box.hidden = !box.hidden;
+    this.textContent = box.hidden ? '＋ 手で入力して追加' : '− 手入力を閉じる';
+  });
+
+  document.getElementById('tkAdd').addEventListener('click', function () {
+    var m = document.getElementById('tkAddMsg');
+    var name = (document.getElementById('tkName').value || '').trim();
+    if (!name) { msg(m, 'ng', '行事名を入れてください。'); return; }
+    this.disabled = true;
+    msg(m, '', '追加しています…');
+    var btn = this;
+    google.script.run.withSuccessHandler(function (r) {
+      btn.disabled = false;
+      if (!r.ok) { msg(m, 'ng', r.error); return; }
+      msg(m, 'ok', r.existing ? '同じ行事がすでにありました。' : '✓ 追加しました');
+      ['tkName', 'tkDate', 'tkDead', 'tkItems'].forEach(function (id) { document.getElementById(id).value = ''; });
+      loadTaikai();
+    }).withFailureHandler(function (e) {
+      btn.disabled = false;
+      msg(m, 'ng', e && e.message ? e.message : e);
+    }).addTaikaiManually({
+      name: name,
+      date: (document.getElementById('tkDate').value || '').trim(),
+      deadline: (document.getElementById('tkDead').value || '').trim(),
+      items: (document.getElementById('tkItems').value || '').trim()
+    });
+  });
+
+  document.getElementById('tkToDone').addEventListener('click', function () { show(4); });
+  document.getElementById('doneToTaikai').addEventListener('click', function () { showTaikai(); });
+  document.getElementById('tkToSetup').addEventListener('click', function () { show(0); });
 
   document.getElementById('closeBtn').addEventListener('click', function () {
     google.script.host.close();
