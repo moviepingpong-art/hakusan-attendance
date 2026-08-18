@@ -14,7 +14,8 @@
 - **BYOB**：データは主催者自身のスプレッドシート。開発者は他団体の個人情報を預からない
 - **識別**：名簿から名前を選ぶ＋端末記憶（localStorageのUUID）。whoamiによる自動識別は捨てた
 - `s` はデプロイIDのみ載せる（URL全体だとLINEがリンク化できない長さになる）
-- `createEvent` だけ書き込みキー必須。キーは主催者のブラウザのlocalStorageにのみ置く
+- `createEvent` だけ書き込みキー必須。ただし**新しいドロッパーは呼ばない**
+  （端末にキャッシュされた旧版のために残してあるだけ。消すと旧版が無反応になる）
 - GASへのPOSTは `Content-Type: text/plain`（`application/json` はプリフライトでこける）
 - 定数はすべて `attendance-api.gs` でのみ宣言（`tally.gs` で再宣言しない→SyntaxError）
 - 回答は上書きせず追記し、集計は latest-row-wins
@@ -52,8 +53,11 @@
 
 ## イベントドロッパーとの連携
 - `dropper/attendance-hook.js` が原本。dropper-app の `calendar*/attendance-hook.js` にコピーして使う
-- dropper-app 側はカードの「🙋 出欠を作る」ボタン＋設定モーダルで実装ずみ（`docs/dropper-integration.md`）
-- 設定は localStorage の `dropper.attend.deployId` / `dropper.attend.writeKey`（`attend/setup.html` と同名キー）
+- **ドロッパーは主催者の表に書き込まない。** カードの「🙋 出欠システムに保存」を押すと、
+  読み取り結果を**クリップボードに載せるだけ**。主催者が表のサイドバー「行事」に貼り付けて取り込む
+- そのため**ドロッパー側に設定が一切ない**（デプロイID・書き込みキー・設定モーダルは撤去ずみ）。
+  端末に何も保存しないので、iOS Safari の「サイト超えトラッキングを防ぐ」等の影響も受けない
+- 符号化は `saveToken`（base64urlのJSON）と `importTaikai` が対。**形を変えるときは両方そろえる**
 - 旧 `?club=hakusan`（CLUB_MODE・大会マスタ書き出し）は dropper-app から**撤去ずみ**
 
 ## 白山クラブ
