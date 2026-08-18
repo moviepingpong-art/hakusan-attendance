@@ -219,6 +219,10 @@
     <button class="btn sub" type="button" data-prev>もどる</button>
     <button class="btn" type="button" data-next>できました → 次へ</button>
   </div>
+  <!-- 公開は「参加者に配る」ためだけに要る。行事を溜めるだけなら後回しでよい。
+       ここで引き返せる道を出しておかないと、デプロイの画面で止まった人が先に進めない。 -->
+  <p style="margin-top:10px"><button class="btn sub wide" type="button" id="skipDeploy">
+    公開はあとにして、先に行事を溜める</button></p>
 </section>
 
 <!-- 4. URL確認 -->
@@ -242,28 +246,11 @@
   <p>この3本が、みなさんに配るURLです。LINEのリッチメニューや、団体のホームページに貼ってください。</p>
   <div id="urls"></div>
 
-  <div class="key">
-    <div class="t">🔑 書き込みキー（人に見せないでください）</div>
-    <div class="url"><div class="row">
-      <input type="text" id="wkey" readonly>
-      <button class="btn" type="button" data-copy="wkey">コピー</button>
-    </div></div>
-    <div class="d" style="font-size:12.5px; color:var(--sub); margin-top:6px;">
-      イベントドロッパーの設定に1回だけ登録すると、要項をドロップするたびに
-      出欠リンク付きの案内文ができます。回答する人には必要ありません。
-    </div>
-  </div>
-
-  <!-- URLとキーを手で写させない。押すとドロッパーが開いて設定が入る。 -->
-  <p style="margin-top:14px">
-    <button class="btn wide" type="button" id="regDropper">イベントドロッパーに登録する ↗</button>
-  </p>
-  <p class="msg" id="regMsg"></p>
-  <div class="hint">押すと新しいタブでイベントドロッパーが開き、上のURLと書き込みキーが
-    そのまま入ります。貼り付ける手間はありません。</div>
-
-  <div class="hint">名簿を直したいときは、いつでもメニュー「出欠システム → セットアップを開く」から。
-    イベントは「イベント」シートに増えていきます。</div>
+  <!-- 書き込みキーはもう主催者に見せない。ドロッパーは表に書き込まなくなったので、
+       どこにも登録しない。必要な人はメニュー「書き込みキーを表示」から見られる。 -->
+  <div class="hint">イベントドロッパーで要項を読ませたら「出欠システムに保存」を押し、
+    <b>行事の画面</b>に貼り付けてください。登録や設定は要りません。</div>
+  <div class="hint">名簿を直したいときは、いつでもメニュー「出欠システム → セットアップを開く」から。</div>
   <div class="nav">
     <button class="btn sub" type="button" data-prev>もどる</button>
     <button class="btn" type="button" id="doneToTaikai">行事の画面へ</button>
@@ -275,10 +262,6 @@
 (function () {
   'use strict';
 
-  /* 完成画面の「イベントドロッパーに登録する」の飛び先。
-     attendance-api.gs の ATTEND_BASE と同じ公開先をさす（あちらは /attend/、こちらは /calendar/）。
-     公開先を変えるときは両方そろえること。 */
-  var DROPPER_BASE = 'https://app.dropper-tools.com/calendar/';
 
   var steps = [].slice.call(document.querySelectorAll('[data-step]'));
   var dots = null;
@@ -330,7 +313,6 @@
   google.script.run.withSuccessHandler(function (s) {
     state = s;
     document.getElementById('org').value = (s.org === '出欠') ? '' : (s.org || '');
-    document.getElementById('wkey').value = s.writeKey || '';
     if (s.members && s.members.length) renderMembers(s.members);
     // 設定が済んでいれば、ふだん使う行事の画面から開く。
     // 完成画面（配るURL）と名簿へは、そこのボタンから行ける。
@@ -506,7 +488,6 @@
   /* ---------- 5. 完成 ---------- */
   function paintDone() {
     document.getElementById('doneOrg').textContent = state.org || '';
-    document.getElementById('wkey').value = state.writeKey || '';
     var L = state.links || {};
     var list = [
       { t: '① 出欠を回答する', u: L.list, d: 'いま受付中のイベントが並びます。リッチメニューの「出欠入力」に。' },
@@ -531,26 +512,6 @@
     var old = b.textContent;
     b.textContent = 'コピーしました';
     setTimeout(function () { b.textContent = old; }, 1500);
-  });
-
-  /* ---------- 5. ドロッパーへ1クリックで登録 ---------- */
-  // URLとキーを手で写させないため、設定を # のうしろに載せて渡す。
-  // # はサーバーに送られず、受け側（calendar/app.js）が読んだ直後にアドレス欄から消す。
-  // 符号化は attendance-hook.js の b64url_ と同じ方式。変えるときは両方そろえること。
-  function b64url(str) {
-    return btoa(unescape(encodeURIComponent(str)))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  }
-
-  document.getElementById('regDropper').addEventListener('click', function () {
-    var m = document.getElementById('regMsg');
-    if (!state.deployId || !state.writeKey) {
-      msg(m, 'ng', '先にステップ4でURLを保存してください。');
-      return;
-    }
-    var token = b64url(JSON.stringify({ d: state.deployId, k: state.writeKey }));
-    window.open(DROPPER_BASE + '#attend=' + token, '_blank');
-    msg(m, 'ok', '✓ 新しいタブで開きました。「つながりました」と出れば登録できています。');
   });
 
   /* ---------- 行事 ---------- */
@@ -663,7 +624,13 @@
     });
   });
 
-  document.getElementById('tkToDone').addEventListener('click', function () { show(4); });
+  // 公開しないまま行事の画面へ。参加者に配る段で戻って公開すればよい。
+  document.getElementById('skipDeploy').addEventListener('click', function () { showTaikai(); });
+
+  document.getElementById('tkToDone').addEventListener('click', function () {
+    // まだ公開していなければ、URLの画面ではなく公開の手順へ送る
+    show(state.deployId && state.links ? 4 : 2);
+  });
   document.getElementById('doneToTaikai').addEventListener('click', function () { showTaikai(); });
   document.getElementById('tkToSetup').addEventListener('click', function () { show(0); });
 
