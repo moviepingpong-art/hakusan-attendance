@@ -23,11 +23,15 @@ var SH = {
   INTRO:   'はじめに',
   CONFIG:  '設定',
   MEMBERS: '名簿',
-  EVENTS:  'イベント',
+  TAIKAI:  '行事',      // 読み取った要項の置き場。出欠を作るかどうかとは別
+  EVENTS:  'イベント',  // 出欠を受け付けている行事
   ANSWERS: '回答',
   LINKS:   '紐付け',
   TALLY:   '集計'
 };
+
+/** サイドバーの行事一覧に出す件数。これより古いものは行事シートを直接見てもらう */
+var TAIKAI_LIST_MAX = 30;
 
 var DEFAULT_TZ = 'Asia/Tokyo';
 var WDAY = ['日', '月', '火', '水', '木', '金', '土'];
@@ -239,25 +243,37 @@ function createEvent_(b) {
   var deadV = toDate_(b.deadline);
   var youkou = normUrl_(b.youkou);
 
+  var out = addEventRow_({
+    name: name, items: items, dateV: dateV, deadV: deadV, youkou: youkou,
+    dateRaw: b.date, deadRaw: b.deadline
+  });
+  out.org = c.org;
+  return out;
+}
+
+/**
+ * 「イベント」シートに1行足す。書き込みキーの確認はしない（呼ぶ側の責任）。
+ * 同じ名前・同じ開催日の行があれば作り直さず、そのIDを existing:true で返す
+ * （要項の二度ドロップでカレンダー予定が重なる事故と同じ轍を踏まないため）。
+ */
+function addEventRow_(a) {
   var out = null;
   withLock_(function () {
-    // 二重ドロップ対策：同じ名前・同じ開催日の行があれば作り直さない
     var dup = null;
     eventRows_().forEach(function (ev) {
-      if (normKey_(ev.name) === normKey_(name) && sameDay_(ev.dateRaw, dateV)) dup = ev;
+      if (normKey_(ev.name) === normKey_(a.name) && sameDay_(ev.dateRaw, a.dateV)) dup = ev;
     });
-    if (dup) { out = { ok: true, eventId: dup.id, org: c.org, existing: true }; return; }
+    if (dup) { out = { ok: true, eventId: dup.id, existing: true }; return; }
 
     var id = newEventId_();
     sheet_(SH.EVENTS).appendRow([
-      id, name,
-      dateV || String(b.date || '').trim(),
-      deadV || String(b.deadline || '').trim(),
-      items.join('、'), youkou, new Date()
+      id, a.name,
+      a.dateV || String(a.dateRaw || '').trim(),
+      a.deadV || String(a.deadRaw || '').trim(),
+      a.items.join('、'), a.youkou || '', new Date()
     ]);
-    out = { ok: true, eventId: id, org: c.org, existing: false };
+    out = { ok: true, eventId: id, existing: false };
   });
-
   return out;
 }
 
@@ -581,6 +597,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('出欠システム')
     .addItem('セットアップを開く', 'セットアップを開く')
+    .addItem('行事から出欠を作る', 'セットアップを開く')   // 同じサイドバー。設定ずみなら行事の画面から開く
     .addItem('集計を更新', 'shukei')
     .addSeparator()
     .addItem('初期設定（シートを作り直す）', '初期設定')
@@ -659,6 +676,10 @@ function 初期設定() {
   ss.setActiveSheet(intro);
 
   ensure(SH.MEMBERS, ['名前', '性別（男／女）', '備考'], [160, 130, 240]);
+  // 行事：読み取った要項を溜めておく。いちばん右の「出欠イベントID」が空なら未使用。
+  ensure(SH.TAIKAI,  ['行事ID', '行事名', '開催日', '申込締切', '会場', '種目（、区切り）',
+                      '要項リンク', '詳細', '登録日時', '出欠イベントID'],
+                     [110, 260, 110, 110, 180, 220, 240, 260, 150, 130]);
   ensure(SH.EVENTS,  ['イベントID', 'イベント名', '開催日', '申込締切', '種目（、区切り）', '要項リンク', '登録日時'],
                      [110, 280, 120, 120, 240, 260, 160]);
   ensure(SH.ANSWERS, ['タイムスタンプ', '端末ID', '名前', 'イベントID', '回答JSON'],
@@ -686,7 +707,7 @@ function 初期設定() {
 function 配布用に空にする() {
   var ui = SpreadsheetApp.getUi();
   var ss = ss_();
-  var targets = [SH.MEMBERS, SH.EVENTS, SH.ANSWERS, SH.LINKS];
+  var targets = [SH.MEMBERS, SH.TAIKAI, SH.EVENTS, SH.ANSWERS, SH.LINKS];
 
   var counts = targets.map(function (n) { return '・' + n + '　' + rows_(n).length + '行'; }).join('\n');
   var org = String(sheet_(SH.CONFIG).getRange('B1').getValue() || '（未設定）');
@@ -774,7 +795,8 @@ function setupScriptUrl() {
 
 /** シートが無ければ黙って作る（セットアップ画面から先に入った人のため） */
 function ensureSheets_() {
-  if (!ss_().getSheetByName(SH.CONFIG) || !ss_().getSheetByName(SH.MEMBERS)) 初期設定();
+  if (!ss_().getSheetByName(SH.CONFIG) || !ss_().getSheetByName(SH.MEMBERS)
+      || !ss_().getSheetByName(SH.TAIKAI)) 初期設定();   // 行事は後から足した。既存の表でも作られるように
   resetIfCopied_();
 }
 
@@ -896,6 +918,166 @@ function setupSaveDeploy(url) {
 
   sheet_(SH.CONFIG).getRange('B4').setValue(id);
   return { ok: true, org: data.org || cfg_().org, deployId: id, links: attendLinks_(id) };
+}
+
+/* ============================================================
+ *  行事（読み取った要項の置き場）
+ *
+ *  イベントドロッパーは主催者の表に書き込まない。読み取った内容を
+ *  クリップボードに載せて渡し、ここで取り込む。だからドロッパー側に
+ *  デプロイIDも書き込みキーも要らない（端末に設定を持たせない）。
+ *
+ *  行事は「保存しただけ」の状態。出欠を受け付けるかは主催者が
+ *  サイドバーで決め、そのとき初めて「イベント」シートへ行が増える。
+ * ========================================================== */
+
+function taikaiRows_() {
+  var tz = cfg_().tz;
+  var list = [];
+  rows_(SH.TAIKAI).forEach(function (r, i) {
+    var id = String(r[0] || '').trim();
+    if (!id) return;
+    list.push({
+      row: i + 2,
+      id: id,
+      name: String(r[1] || '').trim(),
+      dateRaw: r[2],
+      date: fmtDate_(r[2], tz),
+      deadlineRaw: r[3],
+      deadline: fmtDate_(r[3], tz),
+      place: String(r[4] || '').trim(),
+      items: splitItems_(r[5]),
+      youkou: normUrl_(r[6]),
+      detail: String(r[7] || ''),
+      savedAt: r[8],
+      eventId: String(r[9] || '').trim(),
+      sortKey: (toDate_(r[8]) || new Date(0)).getTime()
+    });
+  });
+  return list;
+}
+
+function newTaikaiId_() {
+  var used = {};
+  taikaiRows_().forEach(function (t) { used[t.id] = true; });
+  for (var i = 0; i < 50; i++) {
+    var id = 'tk' + (Date.now() + i).toString(36);
+    if (!used[id]) return id;
+  }
+  return 'tk' + Utilities.getUuid().replace(/-/g, '').slice(0, 10);
+}
+
+/** サイドバーに出す一覧。新しい順に TAIKAI_LIST_MAX 件まで */
+function listTaikai() {
+  ensureSheets_();
+  var all = taikaiRows_().sort(function (a, b) { return b.sortKey - a.sortKey; });
+  var used = {};
+  eventRows_().forEach(function (ev) { used[ev.id] = true; });
+
+  return {
+    ok: true,
+    total: all.length,
+    max: TAIKAI_LIST_MAX,
+    list: all.slice(0, TAIKAI_LIST_MAX).map(function (t) {
+      return {
+        id: t.id, name: t.name, date: t.date, deadline: t.deadline,
+        place: t.place, items: t.items, youkou: t.youkou,
+        // 出欠を作ったあとに手でイベント行を消すこともあるので、実在を確かめてから「出欠あり」と言う
+        eventId: (t.eventId && used[t.eventId]) ? t.eventId : ''
+      };
+    })
+  };
+}
+
+/** 行事を1件足す。同じ行事名・同じ開催日は取り込まない（貼り付けの二度押し対策） */
+function addTaikaiRow_(a) {
+  var name = String(a.name || '').trim();
+  if (!name) return { ok: false, error: '行事名が読み取れませんでした。' };
+
+  var dateV = toDate_(a.date);
+  var items = Array.isArray(a.items)
+    ? a.items.map(function (s) { return String(s).trim(); }).filter(String)
+    : splitItems_(a.items);
+
+  var out = null;
+  withLock_(function () {
+    var dup = null;
+    taikaiRows_().forEach(function (t) {
+      if (normKey_(t.name) === normKey_(name) && sameDay_(t.dateRaw, dateV)) dup = t;
+    });
+    if (dup) { out = { ok: true, taikaiId: dup.id, name: dup.name, existing: true }; return; }
+
+    var id = newTaikaiId_();
+    sheet_(SH.TAIKAI).appendRow([
+      id, name,
+      dateV || String(a.date || '').trim(),
+      toDate_(a.deadline) || String(a.deadline || '').trim(),
+      String(a.place || '').trim(),
+      items.join('、'),
+      normUrl_(a.youkou),
+      a.detail ? String(a.detail).slice(0, 20000) : '',   // セルの上限に余裕を持たせる
+      new Date(), ''
+    ]);
+    out = { ok: true, taikaiId: id, name: name, existing: false };
+  });
+  return out;
+}
+
+/** ドロッパーからコピーした文字列を取り込む */
+function importTaikai(token) {
+  ensureSheets_();
+  var raw = String(token || '').trim();
+  if (!raw) return { ok: false, error: '貼り付ける内容がありません。' };
+
+  var o = null;
+  try {
+    o = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(raw)).getDataAsString('UTF-8'));
+  } catch (e) {
+    return { ok: false, error: 'うまく読み取れませんでした。イベントドロッパーの「出欠システムに保存」で\nコピーした内容を、そのまま貼り付けてください。' };
+  }
+  if (!o || !o.name) return { ok: false, error: 'うまく読み取れませんでした。もう一度コピーしてお試しください。' };
+
+  return addTaikaiRow_({
+    name: o.name, date: o.date, deadline: o.deadline, place: o.place,
+    items: o.items, youkou: o.youkou, detail: o.detail ? JSON.stringify(o.detail) : ''
+  });
+}
+
+/** ドロッパーを使わない団体むけ。サイドバーで手入力して足す */
+function addTaikaiManually(a) {
+  ensureSheets_();
+  return addTaikaiRow_({
+    name: a && a.name, date: a && a.date, deadline: a && a.deadline,
+    place: a && a.place, items: a && a.items, youkou: a && a.youkou, detail: ''
+  });
+}
+
+/**
+ * 保存ずみの行事から出欠を作る。ここは表の中から呼ぶので書き込みキーは要らない
+ * （キーはインターネットからの書き込みを防ぐためのもの）。
+ */
+function createEventFromTaikai(taikaiId, override) {
+  ensureSheets_();
+  var t = null;
+  taikaiRows_().forEach(function (x) { if (x.id === String(taikaiId || '').trim()) t = x; });
+  if (!t) return { ok: false, error: 'その行事が見つかりません。一覧を読み込み直してください。' };
+
+  var o = override || {};
+  var items = Array.isArray(o.items) ? o.items.map(function (s) { return String(s).trim(); }).filter(String)
+                                     : (o.items != null ? splitItems_(o.items) : t.items);
+  if (!items.length) items = ['参加'];
+
+  var deadRaw = (o.deadline != null && String(o.deadline).trim()) ? o.deadline : t.deadlineRaw;
+
+  var res = addEventRow_({
+    name: t.name, items: items,
+    dateV: toDate_(t.dateRaw), deadV: toDate_(deadRaw), youkou: t.youkou,
+    dateRaw: t.dateRaw, deadRaw: deadRaw
+  });
+
+  // 行事側に控えて「出欠あり」にする
+  sheet_(SH.TAIKAI).getRange(t.row, 10).setValue(res.eventId);
+  return { ok: true, eventId: res.eventId, existing: !!res.existing, name: t.name, items: items };
 }
 
 function setupNewWriteKey() {
