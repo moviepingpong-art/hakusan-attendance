@@ -157,15 +157,45 @@
       return;
     }
 
+    // 一覧モードは「選んでから回答」。全部ひらいて縦に並べると、
+    // イベントが増えるほど目的のものに辿り着けなくなる。
+    if (!ATTEND.eventId) { renderList(); return; }
+
     picks = {};
-    $wrap.innerHTML = events.map(cardHtml).join('');
-    $foot.textContent = ATTEND.eventId ? '' : '※ 申込締切をすぎたイベントは表示されません。';
+    $wrap.innerHTML = events.map(cardHtml).join('')
+      + '<a class="ghost" href="?s=' + esc(encodeURIComponent(ATTEND.deployId)) + '">← ほかの予定を見る</a>';
+    $foot.textContent = '';
 
     events.forEach(function (ev) {
       picks[ev.id] = {};
       var mine = ev.mine || {};
       ev.items.forEach(function (it) { if (mine[it]) picks[ev.id][it] = mine[it]; });
     });
+  }
+
+  /** 一覧（見出しだけ）。タップすると個別の回答画面へ */
+  function renderList() {
+    $wrap.innerHTML = events.map(function (ev) {
+      var mine = ev.mine || {};
+      var done = (ev.items || []).filter(function (it) { return !!mine[it]; }).length;
+      var pill = !done ? '<span class="status st-none">未回答</span>'
+        : (done === ev.items.length ? '<span class="status st-done">回答ずみ</span>'
+                                    : '<span class="status st-part">一部だけ回答</span>');
+      // カード全体を <a> で包まないこと。metaHtml が「要項を見る」リンクを含むので
+      // アンカーの入れ子になり、ブラウザが外側の <a> をそこで閉じてしまう。
+      return '<div class="card evcard">'
+        + '<div class="card-head no-border"><h2>' + esc(ev.name) + '</h2>'
+        + ATTEND.metaHtml(ev)
+        + '<div class="evrow">' + pill + '</div>'
+        + '</div>'
+        + '<a class="ghost evgo" href="' + esc(eventUrl(ev.id)) + '">回答する ›</a>'
+        + '</div>';
+    }).join('');
+    $foot.textContent = '※ 申込締切をすぎたイベントは表示されません。';
+  }
+
+  function eventUrl(id) {
+    return '?s=' + encodeURIComponent(ATTEND.deployId) + '&e=' + encodeURIComponent(id);
   }
 
   function cardHtml(ev) {
