@@ -1,5 +1,6 @@
-/* 出欠ドロッパー 共通ロジック v1.0
-   - 主催者のGASウェブアプリを ?s=デプロイID で呼び分ける
+/* 出欠ドロッパー 共通ロジック v1.1
+   - ?s= の中身で呼び先を変える。AKfycb… で始まればGAS版、そうでなければ新API
+     （載せ替えの途中。移行が済んだらGAS版の分岐を消す）
    - 参加者の識別は端末ID（localStorageのUUID）。LINE・LIFFには一切依存しない
 
    キャッシュ対策：attend.js・attend.css を呼ぶ4本の *.html には ?v=YYYYMMDD を付けてある。
@@ -76,9 +77,20 @@ var ATTEND = (function () {
     return /^[A-Za-z0-9_-]{20,200}$/.test(s) ? s : '';
   }
 
+  /* ---------- どちらの出欠システムを呼ぶか ----------
+     載せ替えの途中なので、?s= には2種類が来る。
+       ・GAS版のデプロイID   … かならず AKfycb で始まる70字前後
+       ・新しい団体ID        … api.dropper-tools.com で使う22字
+     GAS版で動いている団体を止めないため、**IDの形を見て呼び分ける**。
+     移行が済んだら、この関数から isGasId のほうを消すだけでよい。 */
+  var API_BASE = 'https://api.dropper-tools.com/';
+
+  function isGasId(id) { return /^AKfycb/.test(id); }
+
   function apiUrl(deployId) {
     var id = parseDeployId(deployId);
-    return id ? 'https://script.google.com/macros/s/' + id + '/exec' : '';
+    if (!id) return '';
+    return isGasId(id) ? 'https://script.google.com/macros/s/' + id + '/exec' : API_BASE;
   }
 
   /* ---------- URLパラメータ ---------- */
@@ -102,8 +114,9 @@ var ATTEND = (function () {
       try {
         data = JSON.parse(text);
       } catch (e) {
-        // GASが未デプロイ・権限不足のときはログインHTMLが返ってくる
-        throw new Error('出欠システムに接続できませんでした。主催者の設定（アクセスできるユーザー＝全員）をご確認ください。');
+        // JSONでない＝出欠システムに届いていない。GAS版だと未デプロイや権限不足のときに
+        // ログイン画面のHTMLが返る。新APIでもリンクが違えば別のものが返る
+        throw new Error('出欠システムに接続できませんでした。主催者からもらったリンクをもう一度お確かめください。');
       }
       return data;
     }).catch(function (err) {
@@ -114,10 +127,13 @@ var ATTEND = (function () {
   }
 
   function get(action, extra, id) {
-    var base = apiUrl(id || deployId);
+    var use = parseDeployId(id || deployId);
+    var base = apiUrl(use);
     if (!base) return Promise.reject(new Error('リンクが正しくありません。'));
     var q = [];
     if (action) q.push('action=' + encodeURIComponent(action));
+    // GASは自分の表しか見ないが、新APIはどの団体かを毎回伝える必要がある
+    if (!isGasId(use)) q.push('s=' + encodeURIComponent(use));
     var p = extra || {};
     Object.keys(p).forEach(function (k) {
       if (p[k] !== undefined && p[k] !== null && p[k] !== '') q.push(k + '=' + encodeURIComponent(p[k]));
@@ -126,13 +142,20 @@ var ATTEND = (function () {
   }
 
   function post(body, id) {
-    var base = apiUrl(id || deployId);
+    var use = parseDeployId(id || deployId);
+    var base = apiUrl(use);
     if (!base) return Promise.reject(new Error('リンクが正しくありません。'));
+    var b = body || {};
+    if (!isGasId(use)) {
+      b = JSON.parse(JSON.stringify(b));
+      b.s = use;
+    }
     return fetchJson(base, {
       method: 'POST',
-      // GASはCORSプリフライトに応えられないので text/plain で送る
+      // GASはCORSプリフライトに応えられないので text/plain で送る。
+      // 新APIも同じ形で受けるので、ここは分けなくてよい（プリフライトが無いぶん1往復速い）
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(b)
     }).then(unwrap);
   }
 

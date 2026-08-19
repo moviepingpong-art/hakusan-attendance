@@ -8,8 +8,8 @@
  *   団体を作るときに合鍵（adminKey）を1回だけ返し、こちらは SHA-256 しか保存しない。
  *   合鍵は**必ずPOSTの本文で受け取る**こと。クエリに載せるとアクセスログや Referer に残る。
  *
- * ★ 段階1の範囲：土台・団体作成・名簿・削除。
- *   行事とイベントと回答（listEvents / event / answer / summary …）は段階2以降。
+ * ★ いまの範囲：土台・団体作成・名簿・削除（段階1）＋参加者の一連（段階2）。
+ *   行事（貼り付け取り込み・出欠を作る）は段階3。
  */
 
 const API_VERSION = 'w1.0';
@@ -61,8 +61,14 @@ async function handleGet(url, env) {
   const action = String(p.action || '').trim();
 
   switch (action) {
-    case 'ping':    return await ping(env, p.s);
-    case 'members': return await publicMembers(env, p.s);
+    case '':
+    case 'events':    return await listEvents(env, p.s, p.d);
+    case 'event':     return await getEvent(env, p.s, p.e, p.d);
+    case 'members':   return await publicMembers(env, p.s);
+    case 'whoami':    return await whoami(env, p.s, p.d);
+    case 'summary':   return await summaryAction(env, p.s, p.e);
+    case 'myanswers': return await myAnswers(env, p.s, p.d);
+    case 'ping':      return await ping(env, p.s);
     default:
       return { ok: false, error: '対応していない呼び出しです（' + action + '）。' };
   }
@@ -72,6 +78,8 @@ async function handlePost(b, env) {
   const action = String(b.action || '').trim();
 
   switch (action) {
+    case 'register':    return await register(env, b);
+    case 'answer':      return await answer(env, b);
     case 'createOrg':   return await createOrg(env, b);
     case 'org':         return await orgHome(env, b);
     case 'saveOrg':     return await saveOrg(env, b);
@@ -98,6 +106,151 @@ async function publicMembers(env, orgId) {
   if (!org) return notFoundOrg();
   await touch(env, org.id);
   return { ok: true, org: org.name, members: await membersOf(env, org.id, false) };
+}
+
+/** 受付中の一覧。締切をすぎたものは出さない（GAS版と同じ） */
+async function listEvents(env, orgId, deviceId) {
+  const org = await findOrg(env, orgId);
+  if (!org) return notFoundOrg();
+  await touch(env, org.id);
+
+  const me = await linkOf(env, org.id, deviceId);
+  const mine = me ? await latestOfName(env, org.id, me.name) : {};
+  const events = (await eventsOf(env, org.id))
+    .filter(ev => !ev.closed)
+    .map(ev => publicEvent(ev, mine[ev.id] || null));
+
+  return { ok: true, org: org.name, member: me, events };
+}
+
+/** イベント1件。**締切後でも返す**（フォーム側で締切表示にするため） */
+async function getEvent(env, orgId, eventId, deviceId) {
+  const org = await findOrg(env, orgId);
+  if (!org) return notFoundOrg();
+  await touch(env, org.id);
+
+  const ev = await findEvent(env, org.id, eventId);
+  if (!ev) return notFoundEvent();
+
+  const me = await linkOf(env, org.id, deviceId);
+  const mine = me ? ((await latestOfName(env, org.id, me.name))[ev.id] || null) : null;
+
+  return { ok: true, org: org.name, member: me, event: publicEvent(ev, mine) };
+}
+
+/** 端末IDから登録ずみの本人を返す */
+async function whoami(env, orgId, deviceId) {
+  const org = await findOrg(env, orgId);
+  if (!org) return notFoundOrg();
+
+  const me = await linkOf(env, org.id, deviceId);
+  return { ok: true, org: org.name, registered: !!me, member: me };
+}
+
+/** e があればその1件、なければ全イベントの集計。**人数のみで個人名は出さない**
+ *  （未回答者の名前を出してよいのは主催者向けの画面だけ） */
+async function summaryAction(env, orgId, eventId) {
+  const org = await findOrg(env, orgId);
+  if (!org) return notFoundOrg();
+  await touch(env, org.id);
+
+  let evs;
+  if (String(eventId == null ? '' : eventId).trim()) {
+    const ev = await findEvent(env, org.id, eventId);
+    if (!ev) return notFoundEvent();
+    evs = [ev];
+  } else {
+    evs = (await eventsOf(env, org.id)).slice().reverse().slice(0, 50);
+  }
+
+  const genders = await genderMap(env, org.id);
+  const summaries = [];
+  for (const ev of evs) {
+    summaries.push(summaryOf(ev, await latestOfEvent(env, org.id, ev.id), genders));
+  }
+
+  return { ok: true, org: org.name, summaries, summary: summaries[0] || null };
+}
+
+/** 締切前の各イベントについて、その端末の最新回答 */
+async function myAnswers(env, orgId, deviceId) {
+  const org = await findOrg(env, orgId);
+  if (!org) return notFoundOrg();
+  await touch(env, org.id);
+
+  const me = await linkOf(env, org.id, deviceId);
+  const mine = me ? await latestOfName(env, org.id, me.name) : {};
+
+  const list = (await eventsOf(env, org.id)).filter(ev => !ev.closed).map(ev => {
+    const ans = mine[ev.id] || null;
+    const items = ev.items.map(it => ({ name: it, answer: (ans && ans[it]) || '' }));
+    const done = items.filter(x => !!x.answer).length;
+    return {
+      id: ev.id, name: ev.name, date: ev.date, deadline: ev.deadline, youkou: ev.youkou,
+      items, answered: done > 0, allAnswered: done > 0 && done === items.length
+    };
+  });
+
+  return { ok: true, org: org.name, member: me, registered: !!me, myanswers: list };
+}
+
+/** 名簿から名前を選んで端末を紐付ける。上書きせず追記し、いちばん新しい行を採用する */
+async function register(env, b) {
+  const org = await findOrg(env, b.s);
+  if (!org) return notFoundOrg();
+
+  const deviceId = String(b.deviceId == null ? '' : b.deviceId).trim();
+  const name = String(b.name == null ? '' : b.name).trim();
+  if (!deviceId) return { ok: false, error: '端末IDがありません。ブラウザを更新してからもう一度お試しください。' };
+  if (!name) return { ok: false, error: 'お名前が選ばれていません。' };
+
+  const mem = (await membersOf(env, org.id, false)).find(m => normKey(m.name) === normKey(name));
+  if (!mem) return { ok: false, error: '名簿にないお名前です。主催者にご確認ください。', notInRoster: true };
+
+  await env.DB.prepare(
+    'INSERT INTO links (org_id, device_id, name, gender, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).bind(org.id, deviceId, mem.name, mem.gender, Date.now()).run();
+  await touch(env, org.id);
+
+  return { ok: true, member: { name: mem.name, gender: mem.gender } };
+}
+
+/** 回答。**上書きせず1件ずつ追記する。** 集計は最新行を採用（GAS版と同じ約束） */
+async function answer(env, b) {
+  const org = await findOrg(env, b.s);
+  if (!org) return notFoundOrg();
+
+  const deviceId = String(b.deviceId == null ? '' : b.deviceId).trim();
+  const me = await linkOf(env, org.id, deviceId);
+  if (!me) return { ok: false, error: '先にお名前の登録が必要です。', needRegister: true };
+
+  const ev = await findEvent(env, org.id, b.eventId);
+  if (!ev) return notFoundEvent();
+  if (ev.closed) return { ok: false, error: 'このイベントは申込締切をすぎています。', closed: true };
+
+  const given = b.answers || {};
+  const clean = {};
+  const stmts = [];
+  const ins = env.DB.prepare(
+    'INSERT INTO answers (org_id, event_id, name, item, mark, device_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  );
+  const now = Date.now();
+
+  for (const it of ev.items) {
+    const mark = normMark(given[it]);
+    if (!mark) continue;
+    clean[it] = mark;
+    stmts.push(ins.bind(org.id, ev.id, me.name, it, mark, deviceId, now));
+  }
+  if (!stmts.length) return { ok: false, error: '回答が選ばれていません。' };
+
+  await env.DB.batch(stmts);
+  await touch(env, org.id);
+
+  return {
+    ok: true, saved: clean, member: me,
+    summary: summaryOf(ev, await latestOfEvent(env, org.id, ev.id), await genderMap(env, org.id))
+  };
 }
 
 
@@ -271,6 +424,123 @@ function normalizeMembers(raw) {
   return { list };
 }
 
+/** イベント。日付の早い順。締切ずみかどうかもここで決める。 */
+async function eventsOf(env, orgId) {
+  const r = await env.DB.prepare(
+    'SELECT id, name, date, deadline, items, youkou, closed FROM events WHERE org_id = ?'
+  ).bind(orgId).all();
+
+  return (r.results || []).map(e => ({
+    id: e.id,
+    name: e.name,
+    date: e.date || '',
+    deadline: e.deadline || '',
+    items: splitItems(e.items),
+    youkou: e.youkou || '',
+    // 手じまい（closed列）と、締切をすぎたかどうか。どちらでも締切扱いにする
+    closed: !!e.closed || isPast(e.deadline || e.date),
+    sortKey: e.date || e.deadline || ''
+  })).sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0));
+}
+
+async function findEvent(env, orgId, eventId) {
+  const id = String(eventId == null ? '' : eventId).trim();
+  if (!id) return null;
+  return (await eventsOf(env, orgId)).find(ev => ev.id === id) || null;
+}
+
+/** 端末IDから本人。追記式なので**いちばん新しい行**を採る。
+ *  名前と性別は名簿から引き直す（主催者が名簿を直したら、そちらが正） */
+async function linkOf(env, orgId, deviceId) {
+  const key = String(deviceId == null ? '' : deviceId).trim();
+  if (!key) return null;
+
+  const row = await env.DB.prepare(
+    'SELECT name, gender FROM links WHERE org_id = ? AND device_id = ? ORDER BY id DESC LIMIT 1'
+  ).bind(orgId, key).first();
+  if (!row) return null;
+
+  const found = { name: row.name, gender: normGender(row.gender) };
+  const m = (await membersOf(env, orgId, true)).find(x => normKey(x.name) === normKey(found.name));
+  if (m) { found.name = m.name; found.gender = m.gender; }
+  return found;
+}
+
+/** その人の最新回答。{ イベントID: { 種目: 〇△× } } */
+async function latestOfName(env, orgId, name) {
+  const r = await env.DB.prepare(
+    'SELECT event_id, item, mark FROM answers WHERE org_id = ? AND name = ? ORDER BY id'
+  ).bind(orgId, name).all();
+
+  const out = {};
+  // 古い順に上書きしていくので、最後に残るのが最新
+  for (const a of (r.results || [])) {
+    (out[a.event_id] = out[a.event_id] || {})[a.item] = a.mark;
+  }
+  return out;
+}
+
+/** イベント1件ぶんの最新回答。{ 名前キー: { name, ans: { 種目: 〇△× } } } */
+async function latestOfEvent(env, orgId, eventId) {
+  const r = await env.DB.prepare(
+    'SELECT name, item, mark FROM answers WHERE org_id = ? AND event_id = ? ORDER BY id'
+  ).bind(orgId, eventId).all();
+
+  const out = {};
+  for (const a of (r.results || [])) {
+    const k = normKey(a.name);
+    if (!out[k]) out[k] = { name: a.name, ans: {} };
+    out[k].ans[a.item] = a.mark;
+  }
+  return out;
+}
+
+/** 名前キー → 性別。集計を男女別にするのに使う */
+async function genderMap(env, orgId) {
+  const map = {};
+  for (const m of await membersOf(env, orgId, true)) map[normKey(m.name)] = m.gender;
+  return map;
+}
+
+function publicEvent(ev, mine) {
+  return {
+    id: ev.id, name: ev.name, date: ev.date, deadline: ev.deadline,
+    items: ev.items, youkou: ev.youkou, closed: ev.closed, mine: mine || null
+  };
+}
+
+/** 人数だけの集計。**個人名は入れない。** 参加者にも見える応答なので、ここに名前を足さないこと。 */
+function summaryOf(ev, byName, genders) {
+  const keys = Object.keys(byName || {});
+  const items = ev.items.map(it => {
+    const cell = { name: it, maru: zero(), sankaku: zero(), batsu: zero() };
+    for (const k of keys) {
+      const mark = normMark(byName[k].ans[it]);
+      if (!mark) continue;
+      const bucket = mark === '〇' ? cell.maru : (mark === '△' ? cell.sankaku : cell.batsu);
+      const g = genders[k] || '';
+      if (g === '男') bucket.m++;
+      else if (g === '女') bucket.f++;
+      else bucket.u++;
+    }
+    return cell;
+  });
+
+  return {
+    id: ev.id, name: ev.name, date: ev.date, deadline: ev.deadline,
+    youkou: ev.youkou, closed: ev.closed, respCount: keys.length, items
+  };
+}
+
+function zero() { return { m: 0, f: 0, u: 0 }; }
+
+function notFoundEvent() {
+  return {
+    ok: false, notFound: true,
+    error: 'イベントが見つかりません。主催者からもらったリンクをもう一度お確かめください。'
+  };
+}
+
 /** 最終アクセスを控える。放置ぶんの自動削除の判定に使う。 */
 async function touch(env, orgId) {
   await env.DB.prepare('UPDATE orgs SET seen_at = ? WHERE id = ?').bind(Date.now(), orgId).run();
@@ -310,6 +580,26 @@ function normGender(v) {
   if (/^(男|男性|m|male|おとこ)$/.test(s)) return '男';
   if (/^(女|女性|f|female|おんな)$/.test(s)) return '女';
   return '';
+}
+
+function normMark(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (/^[〇○◯oO０0]$/.test(s)) return '〇';
+  if (/^[△▲sS]$/.test(s)) return '△';
+  if (/^[×✕✖ｘxX]$/.test(s)) return '×';
+  return '';
+}
+
+function splitItems(v) {
+  return String(v == null ? '' : v).split(/[、,，\n\/／]+/).map(s => s.trim()).filter(Boolean);
+}
+
+/** その日が終わったか。**日本時間で判定する**（Workerの時計はUTCなので、そのままだと9時間ずれる）。
+ *  締切日は「その日いっぱい」まで受け付ける。 */
+function isPast(ymd) {
+  const s = String(ymd == null ? '' : ymd).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  return Date.now() > Date.parse(s + 'T23:59:59+09:00');
 }
 
 /** 推測できない長さのID。合鍵は32バイト（256ビット）なので総当たりは成り立たない。 */
