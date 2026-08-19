@@ -1,0 +1,23 @@
+# 出欠ドロッパー API — Cloudflare Worker の設定
+#
+# 初回の手順は README.md を見ること。database_id は
+# `wrangler d1 create dropper-attendance` が出力した値に**手で書き換える**。
+
+name = "dropper-attendance-api"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# 本番の入口。dropper-tools.com は Cloudflare で取得ずみなので、
+# api.dropper-tools.com をそのまま生やせる。
+routes = [
+  { pattern = "api.dropper-tools.com", custom_domain = true }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dropper-attendance"
+database_id = "ここに wrangler d1 create の出力を貼る"
+
+# 観測。無料枠の上限に近づいたことに気づけるようにしておく
+[observability]
+enabled = true
