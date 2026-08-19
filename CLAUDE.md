@@ -60,6 +60,11 @@
 - 符号化は `saveToken`（base64urlのJSON）と `importTaikai` が対。**形を変えるときは両方そろえる**
 - 旧 `?club=hakusan`（CLUB_MODE・大会マスタ書き出し）は dropper-app から**撤去ずみ**
 
+## 今後の方針（未着手）
+**GASをやめて自前バックエンド（Cloudflare Workers + D1）へ載せ替える**ことを決めた。
+BYOBもやめて、他団体のデータを預かる形にする。理由と段取りは `docs/backend-plan.md`。
+上に書いてあるBYOB前提の記述は、載せ替えが済むまでのもの。**着手前に必ず計画を読み直すこと。**
+
 ## 白山クラブ
 - **旧LIFFシステムは一度も運用しないまま廃止**した（2026-08-12）。移行データなし
 - 立ち上げ手順は `docs/hakusan-setup.md`
