@@ -8,11 +8,11 @@
  *   団体を作るときに合鍵（adminKey）を1回だけ返し、こちらは SHA-256 しか保存しない。
  *   合鍵は**必ずPOSTの本文で受け取る**こと。クエリに載せるとアクセスログや Referer に残る。
  *
- * ★ いまの範囲：土台・団体作成・名簿・削除（段階1）＋参加者の一連（段階2）。
- *   行事（貼り付け取り込み・出欠を作る）は段階3。
+ * ★ いまの範囲：土台・団体作成・名簿・削除（段階1）、参加者の一連（段階2）、
+ *   行事の取り込みと出欠の作成、主催者向けの集計（段階3）。
  */
 
-const API_VERSION = 'w1.0';
+const API_VERSION = 'w1.2';
 
 /** 画面を置いてある出どころ。ここ以外からのブラウザ呼び出しは通さない。
  *  ※ オリジンを混ぜると端末の記憶が別物になる（CLAUDE.md の警告）。増やすときは慎重に。 */
@@ -25,6 +25,9 @@ const ALLOW_ORIGINS = [
 
 /** 名簿の上限。ひとつの団体が際限なく太らないように */
 const MEMBERS_MAX = 500;
+
+/** 行事の一覧に出す件数。これより古いものは画面に出さない（GAS版と同じ） */
+const TAIKAI_LIST_MAX = 30;
 
 
 /* ============================================================
@@ -84,6 +87,13 @@ async function handlePost(b, env) {
     case 'org':         return await orgHome(env, b);
     case 'saveOrg':     return await saveOrg(env, b);
     case 'saveMembers': return await saveMembers(env, b);
+    case 'listTaikai':  return await listTaikai(env, b);
+    case 'importTaikai':      return await importTaikai(env, b);
+    case 'addTaikaiManually': return await addTaikaiManually(env, b);
+    case 'createEventFromTaikai': return await createEventFromTaikai(env, b);
+    case 'adminEvents': return await adminEvents(env, b);
+    case 'tally':       return await tally(env, b);
+    case 'closeEvent':  return await closeEvent(env, b);
     case 'deleteOrg':   return await deleteOrg(env, b);
     default:
       return { ok: false, error: '対応していない呼び出しです（' + action + '）。' };
@@ -186,7 +196,7 @@ async function myAnswers(env, orgId, deviceId) {
     const items = ev.items.map(it => ({ name: it, answer: (ans && ans[it]) || '' }));
     const done = items.filter(x => !!x.answer).length;
     return {
-      id: ev.id, name: ev.name, date: ev.date, deadline: ev.deadline, youkou: ev.youkou,
+      id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText, youkou: ev.youkou,
       items, answered: done > 0, allAnswered: done > 0 && done === items.length
     };
   });
@@ -322,6 +332,138 @@ async function saveMembers(env, b) {
   return { ok: true, members: members.list };
 }
 
+/* ---------- 行事（読み取った要項の置き場） ----------
+   出欠とは別物。ここに貯めておいて、使いたくなったら出欠を作る。 */
+
+async function listTaikai(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const all = await taikaiOf(env, org.row.id);
+  return { ok: true, total: all.length, taikai: all.slice(0, TAIKAI_LIST_MAX) };
+}
+
+/** ドロッパーの「出欠システムに保存」でコピーした文字列を取り込む。
+ *  符号化は dropper/attendance-hook.js の b64url_ と対。**形を変えるときは両方そろえる。** */
+async function importTaikai(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const raw = String(b.token == null ? '' : b.token).trim();
+  if (!raw) return { ok: false, error: '貼り付ける内容がありません。' };
+
+  let o = null;
+  try {
+    o = JSON.parse(new TextDecoder().decode(fromB64url(raw)));
+  } catch (e) {
+    o = null;
+  }
+  if (!o || !o.name) {
+    return {
+      ok: false,
+      error: 'うまく読み取れませんでした。イベントドロッパーの「出欠システムに保存」でコピーした内容を、そのまま貼り付けてください。'
+    };
+  }
+
+  return await addTaikaiRow(env, org.row.id, {
+    name: o.name, date: o.date, deadline: o.deadline, place: o.place,
+    items: o.items, youkou: o.youkou, detail: o.detail ? JSON.stringify(o.detail) : ''
+  });
+}
+
+/** ドロッパーを使わない団体むけ。画面から手で足す */
+async function addTaikaiManually(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+  return await addTaikaiRow(env, org.row.id, {
+    name: b.name, date: b.date, deadline: b.deadline,
+    place: b.place, items: b.items, youkou: b.youkou, detail: ''
+  });
+}
+
+/** 保存ずみの行事から出欠を作る。作ったら行事側に控えて「出欠あり」にする。 */
+async function createEventFromTaikai(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const id = String(b.taikaiId == null ? '' : b.taikaiId).trim();
+  const t = (await taikaiOf(env, org.row.id)).find(x => x.id === id);
+  if (!t) return { ok: false, error: 'その行事が見つかりません。一覧を読み込み直してください。' };
+
+  const o = b.override || {};
+  let items = (o.items != null) ? toItems(o.items) : t.itemsRaw;
+  if (!items.length) items = ['参加'];
+
+  const res = await addEventRow(env, org.row.id, {
+    name: t.name,
+    date: (o.date != null ? toYmd(o.date) : t.date),
+    deadline: (o.deadline != null ? toYmd(o.deadline) : t.deadline),
+    items,
+    youkou: t.youkou
+  });
+
+  await env.DB.prepare('UPDATE taikai SET event_id = ? WHERE org_id = ? AND id = ?')
+    .bind(res.eventId, org.row.id, t.id).run();
+  await touch(env, org.row.id);
+
+  return { ok: true, eventId: res.eventId, existing: !!res.existing, name: t.name, items };
+}
+
+
+/* ---------- 主催者から見た出欠 ---------- */
+
+/** 主催者向けの一覧。**締切ずみも出す**（参加者向けと違うのはここ） */
+async function adminEvents(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const genders = await genderMap(env, org.row.id);
+  const roster = await membersOf(env, org.row.id, false);
+  const list = [];
+
+  for (const ev of (await eventsOf(env, org.row.id)).reverse()) {
+    const byName = await latestOfEvent(env, org.row.id, ev.id);
+    list.push(Object.assign(summaryOf(ev, byName, genders), {
+      pending: pendingNames(roster, byName)
+    }));
+  }
+  return { ok: true, events: list };
+}
+
+/** 1件ぶんの集計。**未回答者の名前が出るのはここだけ。** 参加者向けの応答には決して入れない。 */
+async function tally(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const ev = await findEvent(env, org.row.id, b.eventId);
+  if (!ev) return notFoundEvent();
+
+  const byName = await latestOfEvent(env, org.row.id, ev.id);
+  const roster = await membersOf(env, org.row.id, false);
+
+  return {
+    ok: true,
+    summary: summaryOf(ev, byName, await genderMap(env, org.row.id)),
+    pending: pendingNames(roster, byName),
+    answered: Object.keys(byName).map(k => ({ name: byName[k].name, ans: byName[k].ans }))
+  };
+}
+
+/** 手じまい。締切前でも締め切りたいときと、締切後に開け直したいときの両方に使う */
+async function closeEvent(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const ev = await findEvent(env, org.row.id, b.eventId);
+  if (!ev) return notFoundEvent();
+
+  await env.DB.prepare('UPDATE events SET closed = ? WHERE org_id = ? AND id = ?')
+    .bind(b.closed ? 1 : 0, org.row.id, ev.id).run();
+  await touch(env, org.row.id);
+
+  return { ok: true, eventId: ev.id, closed: !!b.closed };
+}
+
 /** 団体をまるごと消す。削除請求のたびに手作業をしないため、最初から主催者自身が押せるようにしてある。 */
 async function deleteOrg(env, b) {
   const org = await authOrg(env, b);
@@ -424,7 +566,8 @@ function normalizeMembers(raw) {
   return { list };
 }
 
-/** イベント。日付の早い順。締切ずみかどうかもここで決める。 */
+/** イベント。日付の早い順。締切ずみかどうかもここで決める。
+ *  date/deadline は中では 'YYYY-MM-DD'、外に出すときは GAS版と同じ 'YYYY/MM/DD（曜）'。 */
 async function eventsOf(env, orgId) {
   const r = await env.DB.prepare(
     'SELECT id, name, date, deadline, items, youkou, closed FROM events WHERE org_id = ?'
@@ -435,12 +578,83 @@ async function eventsOf(env, orgId) {
     name: e.name,
     date: e.date || '',
     deadline: e.deadline || '',
+    dateText: fmtDate(e.date),
+    deadlineText: fmtDate(e.deadline),
     items: splitItems(e.items),
     youkou: e.youkou || '',
     // 手じまい（closed列）と、締切をすぎたかどうか。どちらでも締切扱いにする
     closed: !!e.closed || isPast(e.deadline || e.date),
     sortKey: e.date || e.deadline || ''
   })).sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0));
+}
+
+/** 行事。新しい順。 */
+async function taikaiOf(env, orgId) {
+  const r = await env.DB.prepare(
+    'SELECT id, name, date, deadline, place, items, youkou, event_id, created_at'
+    + ' FROM taikai WHERE org_id = ? ORDER BY created_at DESC, rowid DESC'
+  ).bind(orgId).all();
+
+  return (r.results || []).map(t => ({
+    id: t.id,
+    name: t.name,
+    date: t.date || '',
+    deadline: t.deadline || '',
+    dateText: fmtDate(t.date),
+    deadlineText: fmtDate(t.deadline),
+    place: t.place || '',
+    items: splitItems(t.items),
+    itemsRaw: splitItems(t.items),
+    youkou: t.youkou || '',
+    eventId: t.event_id || ''
+  }));
+}
+
+/** 行事を1行足す。**同じ行事名・同じ開催日は増やさない**（二重に取り込みがちなので） */
+async function addTaikaiRow(env, orgId, a) {
+  const name = String(a.name == null ? '' : a.name).trim();
+  if (!name) return { ok: false, error: '行事名が読み取れませんでした。' };
+
+  const date = toYmd(a.date);
+  const dup = (await taikaiOf(env, orgId))
+    .find(t => normKey(t.name) === normKey(name) && t.date === date);
+  if (dup) return { ok: true, taikaiId: dup.id, name: dup.name, existing: true };
+
+  const id = 'tk' + randomId(8);
+  await env.DB.prepare(
+    'INSERT INTO taikai (org_id,id,name,date,deadline,place,items,youkou,detail,event_id,created_at)'
+    + ' VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind(
+    orgId, id, name, date, toYmd(a.deadline),
+    String(a.place == null ? '' : a.place).trim(),
+    toItems(a.items).join('、'),
+    normUrl(a.youkou),
+    a.detail ? String(a.detail).slice(0, 20000) : '',
+    '', Date.now()
+  ).run();
+  await touch(env, orgId);
+
+  return { ok: true, taikaiId: id, name, existing: false };
+}
+
+/** 出欠イベントを1行足す。こちらも同じ名前・同じ日は増やさない */
+async function addEventRow(env, orgId, a) {
+  const dup = (await eventsOf(env, orgId))
+    .find(ev => normKey(ev.name) === normKey(a.name) && ev.date === a.date);
+  if (dup) return { ok: true, eventId: dup.id, existing: true };
+
+  const id = 'ev' + randomId(8);
+  await env.DB.prepare(
+    'INSERT INTO events (org_id,id,name,date,deadline,items,youkou,closed,created_at)'
+    + ' VALUES (?,?,?,?,?,?,?,0,?)'
+  ).bind(orgId, id, a.name, a.date, a.deadline, a.items.join('、'), a.youkou || '', Date.now()).run();
+
+  return { ok: true, eventId: id, existing: false };
+}
+
+/** まだ答えていない人の名前。**主催者向けの応答にだけ入れる。** */
+function pendingNames(roster, byName) {
+  return roster.filter(m => !byName[normKey(m.name)]).map(m => m.name);
 }
 
 async function findEvent(env, orgId, eventId) {
@@ -504,7 +718,7 @@ async function genderMap(env, orgId) {
 
 function publicEvent(ev, mine) {
   return {
-    id: ev.id, name: ev.name, date: ev.date, deadline: ev.deadline,
+    id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText,
     items: ev.items, youkou: ev.youkou, closed: ev.closed, mine: mine || null
   };
 }
@@ -527,7 +741,7 @@ function summaryOf(ev, byName, genders) {
   });
 
   return {
-    id: ev.id, name: ev.name, date: ev.date, deadline: ev.deadline,
+    id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText,
     youkou: ev.youkou, closed: ev.closed, respCount: keys.length, items
   };
 }
@@ -592,6 +806,49 @@ function normMark(v) {
 
 function splitItems(v) {
   return String(v == null ? '' : v).split(/[、,，\n\/／]+/).map(s => s.trim()).filter(Boolean);
+}
+
+/** 配列でも読点区切りの文字列でも受ける */
+function toItems(v) {
+  if (Array.isArray(v)) return v.map(s => String(s).trim()).filter(Boolean);
+  return splitItems(v);
+}
+
+function normUrl(v) {
+  const s = String(v == null ? '' : v).trim();
+  return /^https?:\/\//i.test(s) ? s : '';
+}
+
+/** いろいろな書き方の日付を 'YYYY-MM-DD' に寄せる。読めなければ空 */
+function toYmd(v) {
+  const m = String(v == null ? '' : v).trim().match(/(\d{4})\D{1,3}(\d{1,2})\D{1,3}(\d{1,2})/);
+  if (!m) return '';
+  const y = +m[1], mo = +m[2], d = +m[3];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+
+/** 画面に出す形。**GAS版と同じ 'YYYY/MM/DD（曜）' にそろえること。**
+ *  参加者ページの「あと2日」表示がスラッシュ区切りを前提に書かれているので、
+ *  ここを 'YYYY-MM-DD' のまま返すと締切の注意が出なくなる。 */
+function fmtDate(ymd) {
+  const s = String(ymd == null ? '' : ymd).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return s;
+  // 曜日はUTCで組み立てて求める。実行環境の時計に左右されないため
+  const w = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
+  return m[1] + '/' + m[2] + '/' + m[3] + '（' + WDAY[w] + '）';
+}
+
+const WDAY = ['日', '月', '火', '水', '木', '金', '土'];
+
+/** base64url を戻す。ドロッパーの b64url_ と対。 */
+function fromB64url(s) {
+  const b64 = String(s).replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64 + '='.repeat((4 - b64.length % 4) % 4));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 /** その日が終わったか。**日本時間で判定する**（Workerの時計はUTCなので、そのままだと9時間ずれる）。

@@ -263,6 +263,7 @@ var ATTEND = (function () {
     CHOICES: CHOICES,
     TEMPLATE_COPY_URL: TEMPLATE_COPY_URL,
     STORE: STORE,
+    API_BASE: API_BASE,
     deployId: deployId,
     eventId: eventId,
     deviceId: deviceId,
