@@ -28,6 +28,8 @@
   .danger{border-color:var(--batsu);}
   .danger h2{color:var(--batsu);}
   .btn.warn{background:var(--batsu);}
+  /* 消すボタンは、押し間違えないよう他と色を分ける */
+  .btn.sub.del-ev, [data-tkdel]{color:var(--batsu); border-color:var(--batsu);}
   [hidden]{display:none !important;}
 </style>
 </head>
@@ -325,7 +327,11 @@
         return '<div class="tkcard"><div class="n">' + esc(t.name) + '</div>'
           + (meta.length ? '<div class="m">' + esc(meta.join('　/　')) + '</div>' : '')
           + '<div>' + (t.eventId ? '<span class="b yes">✓ 出欠あり</span>' : '<span class="b no">未使用</span>') + '</div>'
-          + (t.eventId ? '' : '<button class="btn wide" style="margin-top:10px;" data-mk="' + esc(t.id) + '" type="button">この行事で出欠を作る</button>')
+          + (t.eventId
+              ? ''
+              : '<button class="btn wide" style="margin-top:10px;" data-mk="' + esc(t.id) + '" type="button">この行事で出欠を作る</button>'
+                + '<button class="btn sub wide" style="margin-top:8px;" data-tkdel="' + esc(t.id) + '" data-name="'
+                + esc(t.name) + '" type="button">この行事を消す</button>')
           + '</div>';
       }).join('');
 
@@ -375,6 +381,16 @@
 
   // 行事一覧は作り直すので、押されたIDで引く
   $('tkList').addEventListener('click', function (e) {
+    var d = e.target.closest('[data-tkdel]');
+    if (d) {
+      if (!window.confirm('「' + d.getAttribute('data-name') + '」を消します。よろしいですか。')) return;
+      d.disabled = true;
+      withKey({ action: 'deleteTaikai', taikaiId: d.getAttribute('data-tkdel') })
+        .then(function () { say($('tkMsg'), '消しました。', 'ok'); loadTaikai(); })
+        .catch(function (err) { d.disabled = false; say($('tkMsg'), err.message, 'ng'); });
+      return;
+    }
+
     var b = e.target.closest('[data-mk]');
     if (!b) return;
     b.disabled = true;
@@ -410,12 +426,29 @@
               : '<p class="pend">全員が答えました。</p>')
           + '<button class="btn sub wide" style="margin-top:10px;" data-close="' + esc(ev.id) + '" data-now="'
           + (ev.closed ? '1' : '0') + '" type="button">' + (ev.closed ? '受付を再開する' : '受付を締め切る') + '</button>'
+          + '<button class="btn sub wide del-ev" style="margin-top:8px;" data-evdel="' + esc(ev.id) + '" data-name="'
+          + esc(ev.name) + '" data-n="' + Number(ev.respCount || 0) + '" type="button">この出欠を消す</button>'
           + '</div>';
       }).join('');
     }).catch(function () { /* 画面上部で伝えるので、ここでは黙る */ });
   }
 
   $('evList').addEventListener('click', function (e) {
+    var d = e.target.closest('[data-evdel]');
+    if (d) {
+      var n = Number(d.getAttribute('data-n') || 0);
+      // 何人ぶんの回答が消えるかを先に言う。あとから「消えると思わなかった」を防ぐため
+      var msg = '「' + d.getAttribute('data-name') + '」の出欠を消します。\n'
+        + (n ? 'すでに集まった' + n + '人ぶんの回答も一緒に消えます。\n' : '')
+        + '元に戻せません。よろしいですか。';
+      if (!window.confirm(msg)) return;
+      d.disabled = true;
+      withKey({ action: 'deleteEvent', eventId: d.getAttribute('data-evdel') })
+        .then(function () { loadEvents(); loadTaikai(); })
+        .catch(function () { d.disabled = false; });
+      return;
+    }
+
     var b = e.target.closest('[data-close]');
     if (!b) return;
     b.disabled = true;
