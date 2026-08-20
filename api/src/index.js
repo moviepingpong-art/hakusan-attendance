@@ -91,7 +91,9 @@ async function handlePost(b, env) {
     case 'importTaikai':      return await importTaikai(env, b);
     case 'addTaikaiManually': return await addTaikaiManually(env, b);
     case 'createEventFromTaikai': return await createEventFromTaikai(env, b);
+    case 'deleteTaikai': return await deleteTaikai(env, b);
     case 'adminEvents': return await adminEvents(env, b);
+    case 'deleteEvent': return await deleteEvent(env, b);
     case 'tally':       return await tally(env, b);
     case 'closeEvent':  return await closeEvent(env, b);
     case 'deleteOrg':   return await deleteOrg(env, b);
@@ -410,6 +412,26 @@ async function createEventFromTaikai(env, b) {
 }
 
 
+/** 行事を消す。**出欠を作ったあとは消せない**（先に出欠のほうを消してもらう）。
+ *  順番を守らせないと、出欠だけが親なしで残って画面から辿れなくなる。 */
+async function deleteTaikai(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const id = String(b.taikaiId == null ? '' : b.taikaiId).trim();
+  const t = (await taikaiOf(env, org.row.id)).find(x => x.id === id);
+  if (!t) return { ok: false, error: 'その行事が見つかりません。一覧を読み込み直してください。' };
+
+  if (t.eventId) {
+    return { ok: false, error: 'この行事からは出欠を作ってあります。先に出欠のほうを削除してください。', hasEvent: true };
+  }
+
+  await env.DB.prepare('DELETE FROM taikai WHERE org_id = ? AND id = ?').bind(org.row.id, t.id).run();
+  await touch(env, org.row.id);
+  return { ok: true, deleted: true, name: t.name };
+}
+
+
 /* ---------- 主催者から見た出欠 ---------- */
 
 /** 主催者向けの一覧。**締切ずみも出す**（参加者向けと違うのはここ） */
@@ -447,6 +469,30 @@ async function tally(env, b) {
     pending: pendingNames(roster, byName),
     answered: Object.keys(byName).map(k => ({ name: byName[k].name, ans: byName[k].ans }))
   };
+}
+
+/** 出欠を消す。**集まった回答も一緒に消える。**
+ *  作り直せるように、元の行事は「未使用」に戻す（行事そのものは残す）。 */
+async function deleteEvent(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const ev = await findEvent(env, org.row.id, b.eventId);
+  if (!ev) return notFoundEvent();
+
+  // 何人ぶん消えるかを返す。画面で「本当に消しますか」を出すのに使う
+  const byName = await latestOfEvent(env, org.row.id, ev.id);
+  const lost = Object.keys(byName).length;
+
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM answers WHERE org_id = ? AND event_id = ?').bind(org.row.id, ev.id),
+    env.DB.prepare('DELETE FROM events  WHERE org_id = ? AND id = ?').bind(org.row.id, ev.id),
+    env.DB.prepare("UPDATE taikai SET event_id = '' WHERE org_id = ? AND event_id = ?")
+      .bind(org.row.id, ev.id)
+  ]);
+  await touch(env, org.row.id);
+
+  return { ok: true, deleted: true, name: ev.name, lost };
 }
 
 /** 手じまい。締切前でも締め切りたいときと、締切後に開け直したいときの両方に使う */
