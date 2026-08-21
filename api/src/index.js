@@ -446,6 +446,8 @@ async function adminEvents(env, b) {
   for (const ev of (await eventsOf(env, org.row.id)).reverse()) {
     const byName = await latestOfEvent(env, org.row.id, ev.id);
     list.push(Object.assign(summaryOf(ev, byName, genders), {
+      manualClosed: ev.manualClosed,
+      datePassed: ev.datePassed,
       pending: pendingNames(roster, byName)
     }));
   }
@@ -628,7 +630,11 @@ async function eventsOf(env, orgId) {
     deadlineText: fmtDate(e.deadline),
     items: splitItems(e.items),
     youkou: e.youkou || '',
-    // 手じまい（closed列）と、締切をすぎたかどうか。どちらでも締切扱いにする
+    // 手じまい（closed列）と、締切をすぎたかどうか。どちらでも締切扱いにする。
+    // ただし**理由は分けて持つ**。主催者の画面で「手で締めた」のか
+    // 「日が過ぎた」のかが分からないと、再開できるのかどうか判断できない
+    manualClosed: !!e.closed,
+    datePassed: isPast(e.deadline || e.date),
     closed: !!e.closed || isPast(e.deadline || e.date),
     sortKey: e.date || e.deadline || ''
   })).sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0));

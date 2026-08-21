@@ -418,16 +418,26 @@
         var meta = [];
         if (ev.date) meta.push('開催 ' + ev.date);
         if (ev.deadline) meta.push('締切 ' + ev.deadline);
+        // 「手で締めた」と「締切日をすぎた」は分けて出す。
+        // 同じ「締切ずみ」に見えると、再開できるのかどうか分からない
+        var state = ev.manualClosed ? '<span class="b no">手じまい中</span>'
+                  : ev.datePassed   ? '<span class="b no">締切日をすぎました</span>'
+                                    : '<span class="b yes">受付中</span>';
         return '<div class="tkcard"><div class="n">' + esc(ev.name) + '</div>'
           + (meta.length ? '<div class="m">' + esc(meta.join('　/　')) + '</div>' : '')
-          + '<div>' + (ev.closed ? '<span class="b no">締切ずみ</span>' : '<span class="b yes">受付中</span>')
+          + '<div>' + state
           + '　<span class="b no">回答 ' + Number(ev.respCount || 0) + '人</span></div>'
           + ATTEND.summaryHtml(ev)
           + (ev.pending && ev.pending.length
               ? '<p class="pend">まだ答えていない方（' + ev.pending.length + '人）：' + esc(ev.pending.join('、')) + '</p>'
               : '<p class="pend">全員が答えました。</p>')
-          + '<button class="btn sub wide" style="margin-top:10px;" data-close="' + esc(ev.id) + '" data-now="'
-          + (ev.closed ? '1' : '0') + '" type="button">' + (ev.closed ? '受付を再開する' : '受付を締め切る') + '</button>'
+          // 締切日をすぎたぶんは再開しても受け付けられない（日付で閉じるため）。
+          // 押せるように見せると混乱するので、その場合はボタンを出さない
+          + (ev.datePassed && !ev.manualClosed
+              ? ''
+              : '<button class="btn sub wide" style="margin-top:10px;" data-close="' + esc(ev.id) + '" data-now="'
+                + (ev.manualClosed ? '1' : '0') + '" type="button">'
+                + (ev.manualClosed ? '受付を再開する' : '受付を締め切る') + '</button>')
           + '<button class="btn sub wide del-ev" style="margin-top:8px;" data-evdel="' + esc(ev.id) + '" data-name="'
           + esc(ev.name) + '" data-n="' + Number(ev.respCount || 0) + '" type="button">この出欠を消す</button>'
           + '</div>';
