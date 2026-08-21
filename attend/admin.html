@@ -328,7 +328,9 @@
           + (meta.length ? '<div class="m">' + esc(meta.join('　/　')) + '</div>' : '')
           + '<div>' + (t.eventId ? '<span class="b yes">✓ 出欠あり</span>' : '<span class="b no">未使用</span>') + '</div>'
           + (t.eventId
-              ? ''
+              // 出欠を作ってある行事は消せない。**理由を書かないと押せない訳が分からない**
+              ? '<p class="pend">出欠を作ってあるので、この行事は消せません。'
+                + '消したいときは、下の「出欠の集まり具合」でこの出欠を先に消してください。</p>'
               : '<button class="btn wide" style="margin-top:10px;" data-mk="' + esc(t.id) + '" type="button">この行事で出欠を作る</button>'
                 + '<button class="btn sub wide" style="margin-top:8px;" data-tkdel="' + esc(t.id) + '" data-name="'
                 + esc(t.name) + '" type="button">この行事を消す</button>')
