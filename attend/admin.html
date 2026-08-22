@@ -704,17 +704,27 @@
   });
 
   /* ---------- ドロッパーへ帰る ----------
-     この画面はドロッパーが開いた**別のタブ**なので、ブラウザの「戻る」では戻れない。
-     開いた側のタブは案内文もカードも抱えたまま残っているので、**閉じて戻す**のがいちばん近い。
-     自分で開いたタブでないと閉じられないため、opener があるときだけ出す。 */
+     ドロッパーからの来かたが2通りあり、帰り方も2通りになる。
+
+       別のタブで開かれた（ふつうのブラウザ）  → 閉じる。もとのタブがそのまま残っている
+       同じ画面で来た（ホーム画面のアプリ）    → 前の画面へ戻る。タブが1枚しかないため
+
+     ホーム画面のアプリはブラウザとは別の入れものなので、そこから新しいタブを開くと
+     記憶もログインも無いブラウザ側に飛び出す。だからドロッパー側が同じ画面で来る。 */
   function opener() {
     try { return window.opener && !window.opener.closed ? window.opener : null; }
     catch (e) { return null; }   // 別の出どころから開かれていたら触れない
   }
 
-  if (opener()) show($('backBar'), true);
+  /* 「戻る」を出してよいのは、直前がドロッパーだったときだけ。
+     #t= を持っているかどうかでは判断しない（リンクを手で開いた場合、戻り先が別物になる）。 */
+  var fromDropper = /^https?:\/\/[^/]+\/calendar(-[a-z]+)?\//.test(document.referrer || '');
+  var backWay = opener() ? 'close' : (fromDropper && history.length > 1 ? 'back' : '');
+  if (backWay) show($('backBar'), true);
 
   $('backGo').addEventListener('click', function () {
+    if (backWay === 'back') { history.back(); return; }
+
     var o = opener();
     if (o) { try { o.focus(); } catch (e) { /* noop */ } }
     window.close();
