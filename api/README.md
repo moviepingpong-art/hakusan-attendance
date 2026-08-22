@@ -68,8 +68,22 @@ npx wrangler deploy
 
 GASのような「デプロイを管理→鉛筆→新しいバージョン」の作法は無い。URLも変わらない。
 
-スキーマを足したときは `--remote` の `d1 execute` も忘れずに。
-`schema.sql` は `CREATE TABLE IF NOT EXISTS` なので、何度流しても壊れない。
+### ★ 順番を守ること
+
+**`git pull` → マイグレーション → `deploy`。** この順を崩すと本番が止まる。
+
+`schema.sql` は `CREATE TABLE IF NOT EXISTS` なので、**すでにあるテーブルには列が増えない。**
+列を足したときは `migrations/` に1本置き、`--remote` で流す。
+
+```bash
+npx wrangler d1 execute dropper-attendance --remote --file=./migrations/0001-events-place.sql
+```
+
+`pull` を忘れるとマイグレーションのファイルがそもそも手元に無く、
+それに気づかず `deploy` だけ通すと、**新しいコードが存在しない列を読んで出欠ページが落ちる**
+（実際にやった）。落ちたときは、pull してマイグレーションを流せば復旧する。deploy のやり直しは要らない。
+
+二度流しても `duplicate column name` で止まるだけで、害はない。
 
 ---
 
