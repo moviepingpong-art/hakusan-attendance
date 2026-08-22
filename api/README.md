@@ -2,9 +2,9 @@
 
 GAS版の置き換え。計画の全体像は [`../docs/backend-plan.md`](../docs/backend-plan.md)。
 
-**いまは段階3まで。** 主催者の管理画面（`attend/admin.html`）から、
+**載せ替えは完了した（2026-08-22）。** 主催者の管理画面（`attend/admin.html`）から、
 団体づくり・名簿・行事の取り込み・出欠の作成・集計・削除まで通しで動く。
-残っているのは白山クラブの作り直しと、GAS版の後始末（段階4・5）。
+GAS版は撤去ずみ。
 
 ---
 
@@ -14,13 +14,17 @@ GAS版の置き換え。計画の全体像は [`../docs/backend-plan.md`](../doc
 |---|---|
 | `src/index.js` | API本体。これ1本 |
 | `schema.sql` | D1のテーブル定義 |
-| `wrangler.toml` | Workerの設定。`database_id` だけ手で埋める |
+| `wrangler.toml` | Workerの設定。本番の `database_id` が入っている |
 
 依存パッケージは無い。`npm install` は要らない。
 
 ---
 
 ## 初回の手順
+
+**本番はもう立ち上がっている。** ここは、まっさらなCloudflareアカウントで
+一から作り直すときの手順（`wrangler.toml` の `database_id` も差し替えになる）。
+すでにあるものを直すだけなら「直したあと」へ。
 
 Cloudflareにログインした状態で、`api/` の中で実行する。
 **カード登録は要らない**（Workers・D1とも無料枠のまま始められる）。
@@ -47,6 +51,9 @@ npx wrangler deploy
 ```
 
 4で `api.dropper-tools.com` が生える。DNSはCloudflare管理なので、こちらの操作は要らない。
+
+> **`npx wrangler login` はPCごとに要る。** スマホのブラウザでCloudflareにログインしても、
+> PCのコマンドは認証されない（実際にここで詰まった）。
 
 ### 動いているか確かめる
 

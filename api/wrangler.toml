@@ -1,7 +1,10 @@
 # 出欠ドロッパー API — Cloudflare Worker の設定
 #
-# 初回の手順は README.md を見ること。database_id は
-# `wrangler d1 create dropper-attendance` が出力した値に**手で書き換える**。
+# 初回の手順は README.md を見ること。
+#
+# database_id には**本番の値がすでに入っている**。ふだんは触らなくてよい。
+# 別のCloudflareアカウントで動かすときだけ、`wrangler d1 create dropper-attendance`
+# が出力した値に書き換える。
 
 name = "dropper-attendance-api"
 main = "src/index.js"
