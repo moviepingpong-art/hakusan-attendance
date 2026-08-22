@@ -12,6 +12,10 @@
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
   .tkcard .n{font-weight:700; font-size:16px; line-height:1.4;}
   .tkcard .m{font-size:13.5px; color:var(--sub); margin:4px 0 0;}
+  /* ドロッパーから届いた行事。ふつうの行事カードと見分けがつくようにする */
+  .tkcard.in{border-color:var(--maru); background:var(--maru-bg);}
+  .conn{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 14px;}
+  .conn .hint{margin:0 0 10px;}
   .b{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:3px 10px; margin:8px 0 0;}
   .b.no{background:#eef3f7; color:var(--sub);}
   .b.yes{background:var(--maru-bg); color:var(--maru);}
@@ -82,10 +86,33 @@
     <!-- 行事 -->
     <section class="step">
       <h2>行事から出欠を作る</h2>
-      <p>イベントドロッパーで「🙋 出欠システムに保存」を押したら、ここに貼り付けてください。</p>
-      <textarea id="tkToken" placeholder="ここに貼り付け" autocomplete="off"></textarea>
+
+      <!-- ドロッパーから届いた行事。#t= で開いたときだけ出る -->
+      <div class="tkcard in" id="tkIn" hidden>
+        <div class="n" id="tkInName">イベントドロッパーから届きました</div>
+        <div class="m" id="tkInMeta"></div>
+        <p class="msg" id="tkInMsg"></p>
+        <button class="btn wide" id="tkInGo" type="button" hidden>この内容で出欠を受け付ける</button>
+        <button class="btn sub wide" id="tkInLater" type="button" style="margin-top:8px;">とじる</button>
+      </div>
+
+      <!-- ドロッパーとつなぐ（合鍵をこの端末に覚えるかどうか） -->
+      <div class="conn">
+        <p class="hint" id="connNote"></p>
+        <button class="btn sub" id="connGo" type="button">この端末に覚える</button>
+      </div>
+
+      <p>イベントドロッパーの「🙋 出欠システムに保存」から、この画面が開いて取り込まれます。</p>
       <p class="msg" id="tkMsg"></p>
-      <button class="btn wide" id="tkImport" type="button">貼り付けて取り込む</button>
+
+      <!-- 貼り付けは、タブが開かなかったときの逃げ道。ふだんは畳んでおく -->
+      <button class="btn sub wide" id="tkPasteBtn" type="button">この画面が開かなかったときは</button>
+      <div id="tkPaste" hidden style="margin-top:12px;">
+        <p class="hint">ドロッパーの「🙋 出欠システムに保存」を押したときにコピーされた内容を、
+           ここに貼り付けてください。</p>
+        <textarea id="tkToken" placeholder="ここに貼り付け" autocomplete="off"></textarea>
+        <button class="btn wide" id="tkImport" type="button">貼り付けて取り込む</button>
+      </div>
 
       <div id="tkList" style="margin-top:16px;"></div>
       <p class="hint" id="tkMore" hidden></p>
@@ -168,23 +195,71 @@
   var show = function (el, on) { el.hidden = !on; };
   var say = function (el, text, cls) { el.textContent = text; el.className = 'msg' + (cls ? ' ' + cls : ''); };
 
+  /* ---------- 端末の記憶 ----------
+     localStorage は、ブロックされていると例外を投げずに黙って捨てる実装がある。
+     書いたら読み直して確かめること。 */
+  var REM = 'dropperAdminKey';   // この端末に覚えた合鍵
+  var PEND = 'dropperPending';   // 合鍵が無いときの、取り込み待ちの置き場
+  var PEND_MS = 60 * 60 * 1000;  // 1時間で捨てる。放置された行事が忘れたころに湧かないように
+
+  function pick(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function store(k, v) {
+    try {
+      if (v == null) { localStorage.removeItem(k); return !localStorage.getItem(k); }
+      localStorage.setItem(k, v);
+      return localStorage.getItem(k) === v;
+    } catch (e) { return false; }
+  }
+
   /* ---------- 合鍵 ----------
      合鍵は # のうしろに置く。# はサーバーに送られないので、アクセスログにも
-     Referer にも残らない。?k= で来た人は # に移し替えてから読む。 */
+     Referer にも残らない。?k= で来た人は # に移し替えてから読む。
+     #t= はドロッパーから届いた行事。合鍵とは別物で、こちらは使い捨て。 */
   var adminKey = '';
-  (function readKey() {
+  var keyFromUrl = false;
+  var inToken = '';
+  (function readHash() {
     var h = (location.hash || '').replace(/^#/, '');
-    var m = h.match(/(?:^|&)k=([^&]+)/);
-    if (m) { adminKey = decodeURIComponent(m[1]); return; }
+    var mk = h.match(/(?:^|&)k=([^&]+)/);
+    if (mk) { adminKey = decodeURIComponent(mk[1]); keyFromUrl = true; }
+    var mt = h.match(/(?:^|&)t=([^&]+)/);
+    if (mt) inToken = decodeURIComponent(mt[1]);
 
     var q = new URLSearchParams(location.search);
-    if (q.get('k')) {
+    if (!adminKey && q.get('k')) {
       adminKey = q.get('k');
+      keyFromUrl = true;
       q.delete('k');
       var url = location.pathname + (q.toString() ? '?' + q : '') + '#k=' + encodeURIComponent(adminKey);
       try { history.replaceState(null, '', url); } catch (e) { /* 古い端末では諦める */ }
     }
+
+    // 覚えてあるなら、リンクなしで開いても使える
+    if (!adminKey) adminKey = pick(REM);
+
+    /* #t= はアドレス欄から消す。読み直しで二度取り込まないためと、
+       ドロッパーから開いたタブに合鍵を映さないため（記憶から来た合鍵は # に書き戻さない）。 */
+    if (inToken) {
+      var q2 = new URLSearchParams(location.search);
+      var back = location.pathname + (q2.toString() ? '?' + q2 : '')
+        + (keyFromUrl ? '#k=' + encodeURIComponent(adminKey) : '');
+      try { history.replaceState(null, '', back); } catch (e) { /* noop */ }
+    }
   })();
+
+  /* 合鍵が無いまま届いた行事は、しばらく預かる。
+     主催者が管理リンクを開き直したときに、貼り付けずに済むように。 */
+  function keepPending(token) { store(PEND, JSON.stringify({ t: token, at: Date.now() })); }
+  function takePending() {
+    var raw = pick(PEND);
+    if (!raw) return '';
+    store(PEND, null);
+    try {
+      var o = JSON.parse(raw);
+      if (o && o.t && Date.now() - (o.at || 0) < PEND_MS) return o.t;
+    } catch (e) { /* 壊れていたら捨てるだけ */ }
+    return '';
+  }
 
   /* ---------- 通信 ----------
      ATTEND.post は ?s= を前提にしているが、団体を作る前は ?s= が無い。
@@ -197,7 +272,11 @@
     }).then(function (r) { return r.text(); }).then(function (t) {
       var d;
       try { d = JSON.parse(t); } catch (e) { throw new Error('出欠システムに接続できませんでした。'); }
-      if (!d || d.ok !== true) throw new Error((d && d.error) || 'エラーが起きました。');
+      if (!d || d.ok !== true) {
+        var err = new Error((d && d.error) || 'エラーが起きました。');
+        err.needKey = !!(d && d.needKey);   // 合鍵そのものが通らなかったのか、を呼び手で見分ける
+        throw err;
+      }
       return d;
     });
   }
@@ -302,9 +381,16 @@
       if (!d.members.length) memberRow($edRows, null);
 
       show($('home'), true);
+      paintConn();
       loadTaikai();
       loadEvents();
+
+      var token = inToken || takePending();
+      inToken = '';
+      if (token) receive(token);
     }).catch(function (e) {
+      // 覚えていた合鍵が通らなくなっていたら（団体を消したなど）、記憶のほうを捨てる
+      if (e.needKey && pick(REM) === adminKey) store(REM, null);
       show($('home'), false);
       show($('newScreen'), true);
       if (adminKey) say($('newMsg'), e.message, 'ng');
@@ -312,8 +398,10 @@
   }
 
   /* 行事 */
-  function loadTaikai() {
-    withKey({ action: 'listTaikai' }).then(function (d) {
+  var tkRows = [];          // 届いた行事の中身を引くのに使う（一覧に出ているものだけ）
+  function loadTaikai(done) {
+    return withKey({ action: 'listTaikai' }).then(function (d) {
+      tkRows = d.taikai || [];
       var box = $('tkList');
       if (!d.taikai.length) {
         box.innerHTML = '<p class="hint">まだ行事がありません。上に貼り付けるか、下のボタンから手で入力してください。</p>';
@@ -342,8 +430,99 @@
         $('tkMore').textContent = '新しい' + d.taikai.length + '件を出しています（全' + d.total + '件）。';
         show($('tkMore'), true);
       } else { show($('tkMore'), false); }
-    }).catch(function (e) { say($('tkMsg'), e.message, 'ng'); });
+    }).then(function () { if (done) done(); })
+      .catch(function (e) { say($('tkMsg'), e.message, 'ng'); });
   }
+
+  /* ---------- ドロッパーから届いた行事 ----------
+     取り込みまでは自動。出欠を受け付けるかどうかは、中身を見せてから1タップで決めてもらう。
+     読み違えた締切のまま受付が始まるのがいちばん困るため、ここは自動にしない。 */
+  function showIncoming(id) {
+    var t = null;
+    for (var i = 0; i < tkRows.length; i++) { if (tkRows[i].id === id) t = tkRows[i]; }
+    if (!t) { show($('tkIn'), false); return; }
+
+    var meta = [];
+    if (t.dateText) meta.push('開催 ' + t.dateText);
+    if (t.deadlineText) meta.push('締切 ' + t.deadlineText);
+    if (t.items.length) meta.push(t.items.join('、'));
+
+    $('tkInName').textContent = t.name;
+    $('tkInMeta').textContent = meta.join('　/　');
+    $('tkInGo').setAttribute('data-mk', t.id);
+    $('tkInGo').disabled = false;
+    $('tkInGo').textContent = 'この内容で出欠を受け付ける';
+
+    if (t.eventId) {
+      say($('tkInMsg'), 'この行事は、すでに出欠を受け付けています。', 'ok');
+      show($('tkInGo'), false);
+    } else {
+      say($('tkInMsg'), '取り込みました。この内容でよければ、出欠の受付を始められます。', 'ok');
+      show($('tkInGo'), true);
+    }
+    show($('tkIn'), true);
+  }
+
+  function receive(token) {
+    show($('tkIn'), true);
+    show($('tkInGo'), false);
+    $('tkInName').textContent = 'イベントドロッパーから届きました';
+    $('tkInMeta').textContent = '';
+    say($('tkInMsg'), '取り込んでいます…');
+
+    withKey({ action: 'importTaikai', token: token }).then(function (d) {
+      loadTaikai(function () { showIncoming(d.taikaiId); });
+    }).catch(function (e) {
+      say($('tkInMsg'), e.message, 'ng');
+    });
+  }
+
+  $('tkInLater').addEventListener('click', function () { show($('tkIn'), false); });
+
+  $('tkInGo').addEventListener('click', function () {
+    var b = this;
+    b.disabled = true;
+    b.textContent = '始めています…';
+    withKey({ action: 'createEventFromTaikai', taikaiId: b.getAttribute('data-mk') })
+      .then(function () {
+        say($('tkInMsg'), '出欠の受付を始めました。参加者の一覧に出ています。', 'ok');
+        show($('tkInGo'), false);
+        loadTaikai();
+        loadEvents();
+      })
+      .catch(function (err) {
+        b.disabled = false;
+        b.textContent = 'この内容で出欠を受け付ける';
+        say($('tkInMsg'), err.message, 'ng');
+      });
+  });
+
+  /* ---------- この端末に覚える ----------
+     覚えておくと、ドロッパーの「出欠システムに保存」から直にここへ取り込める。
+     覚えないと、届いた行事は預かるが、毎回ご自分の管理リンクを開き直すことになる。 */
+  function paintConn() {
+    var on = pick(REM) && pick(REM) === adminKey;
+    $('connNote').innerHTML = on
+      ? 'この端末は<b>この団体の管理リンクを覚えています</b>。イベントドロッパーの「🙋 出欠システムに保存」から、そのままここに取り込めます。'
+        + '<br>共用の端末では消してください。<b>覚えていても、管理リンクの控えは必ず別に残しておいてください。</b>'
+      : 'イベントドロッパーの「🙋 出欠システムに保存」から直に取り込めるようにするには、この端末に管理リンクを覚えさせてください。'
+        + '<br><b>この端末を使える人は、あなたと同じ操作ができるようになります。</b>共用の端末では覚えさせないでください。';
+    $('connGo').textContent = on ? 'この端末から消す' : 'この端末に覚える';
+  }
+
+  $('connGo').addEventListener('click', function () {
+    var on = pick(REM) && pick(REM) === adminKey;
+    if (on) {
+      store(REM, null);
+      paintConn();
+      return;
+    }
+    if (!store(REM, adminKey)) {
+      say($('tkMsg'), 'この端末は記憶を受け付けませんでした（プライベートブラウズなど）。貼り付けでお使いください。', 'ng');
+      return;
+    }
+    paintConn();
+  });
 
   $('tkImport').addEventListener('click', function () {
     var token = $('tkToken').value.trim();
@@ -359,6 +538,13 @@
       $('tkImport').disabled = false;
       say($('tkMsg'), e.message, 'ng');
     });
+  });
+
+  $('tkPasteBtn').addEventListener('click', function () {
+    var on = $('tkPaste').hidden;
+    show($('tkPaste'), on);
+    this.textContent = on ? '貼り付けをとじる' : 'この画面が開かなかったときは';
+    if (on) $('tkToken').focus();
   });
 
   $('tkManualBtn').addEventListener('click', function () {
@@ -500,6 +686,7 @@
 
     this.disabled = true;
     withKey({ action: 'deleteOrg', confirm: name }).then(function () {
+      if (pick(REM) === adminKey) store(REM, null);   // 消えた団体の合鍵を端末に残さない
       document.body.innerHTML =
         '<header><h1>削除しました</h1></header>'
         + '<div class="wiz"><section class="step"><p>この団体のデータはすべて消えました。'
@@ -507,9 +694,23 @@
     }).catch(function (e) { $('delGo').disabled = false; say($('delMsg'), e.message, 'ng'); });
   });
 
-  /* ---------- 入口 ---------- */
-  if (adminKey) load();
-  else show($('newScreen'), true);
+  /* ---------- 入口 ----------
+     この画面を開いたまま管理リンク（#k=…）を開くと、ブラウザは # だけ差し替えて
+     読み直さない。合鍵が届いたことに気づけないので、読み直させる。 */
+  window.addEventListener('hashchange', function () { location.reload(); });
+
+  if (adminKey) {
+    load();
+  } else {
+    show($('newScreen'), true);
+    // 合鍵が無いのに行事が届いた。捨てずに預かって、管理リンクで開き直してもらう
+    if (inToken) {
+      keepPending(inToken);
+      say($('newMsg'),
+        'イベントドロッパーから行事を受け取りました。取り込む先が分からないので、'
+        + 'ご自分の管理リンク（ブックマークに入れたもの）を開いてください。1時間だけお預かりします。', 'ok');
+    }
+  }
 })();
 </script>
 </body>
