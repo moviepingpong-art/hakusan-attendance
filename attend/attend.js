@@ -1,4 +1,4 @@
-/* 出欠ドロッパー 共通ロジック v1.2
+/* 出欠ドロッパー 共通ロジック v1.3
    - ?s= の中身で呼び先を変える。AKfycb… で始まればGAS版、そうでなければ新API
      （載せ替えの途中。移行が済んだらGAS版の分岐を消す）
    - 参加者の識別は端末ID（localStorageのUUID）。LINE・LIFFには一切依存しない
@@ -10,18 +10,7 @@
 var ATTEND = (function () {
   'use strict';
 
-  /* ===== 配布時にここだけ差し替える =====
-     主催者向けテンプレのスプレッドシートのコピーURL（末尾を /copy にしたもの）。
-     空のままだと setup.html の1番目のボタンが「準備中」になります。 */
-  var TEMPLATE_COPY_URL = 'https://docs.google.com/spreadsheets/d/1ESlESrWQLGtwR-n2QHbK6AssZKuc84AUVWo_Ke_g0ew/copy';
-  /* ====================================== */
-
   var DEVICE_KEY = 'attend.deviceId';
-  var STORE = {
-    deployId: 'dropper.attend.deployId',   // イベントドロッパーと共有する
-    writeKey: 'dropper.attend.writeKey',
-    org:      'dropper.attend.org'
-  };
   var TIMEOUT_MS = 25000;
 
   var CHOICES = [
@@ -293,16 +282,8 @@ var ATTEND = (function () {
     return true;
   }
 
-  /* ---------- 3本のURLを組み立てる（setup.html用） ---------- */
-  function pageUrl(page, id) {
-    var base = window.location.href.split('?')[0].split('#')[0].replace(/[^/]*$/, '');
-    return base + (page || '') + '?s=' + encodeURIComponent(id || deployId);
-  }
-
   return {
     CHOICES: CHOICES,
-    TEMPLATE_COPY_URL: TEMPLATE_COPY_URL,
-    STORE: STORE,
     API_BASE: API_BASE,
     deployId: deployId,
     eventId: eventId,
@@ -320,7 +301,6 @@ var ATTEND = (function () {
     noteHtml: noteHtml,
     loadingHtml: loadingHtml,
     requireDeployId: requireDeployId,
-    pageUrl: pageUrl,
     lsGet: lsGet,
     lsSet: lsSet,
     lsDel: lsDel
