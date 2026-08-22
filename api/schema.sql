@@ -54,7 +54,9 @@ CREATE TABLE IF NOT EXISTS events (
   date       TEXT NOT NULL DEFAULT '',
   deadline   TEXT NOT NULL DEFAULT '',
   items      TEXT NOT NULL DEFAULT '',
-  youkou     TEXT NOT NULL DEFAULT '',
+  youkou     TEXT NOT NULL DEFAULT '',        -- 要項へのリンク
+  place      TEXT NOT NULL DEFAULT '',        -- 会場名。回答画面の地図ボタンに使う
+  address    TEXT NOT NULL DEFAULT '',        -- 会場の住所。あればこちらで地図を引く
   closed     INTEGER NOT NULL DEFAULT 0,      -- 手じまい。締切の判定とは別
   created_at INTEGER NOT NULL,
   PRIMARY KEY (org_id, id)

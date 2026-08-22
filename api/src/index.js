@@ -12,7 +12,7 @@
  *   行事の取り込みと出欠の作成、主催者向けの集計（段階3）。
  */
 
-const API_VERSION = 'w1.2';
+const API_VERSION = 'w1.3';
 
 /** 画面を置いてある出どころ。ここ以外からのブラウザ呼び出しは通さない。
  *  ※ オリジンを混ぜると端末の記憶が別物になる（CLAUDE.md の警告）。増やすときは慎重に。 */
@@ -401,7 +401,9 @@ async function createEventFromTaikai(env, b) {
     date: (o.date != null ? toYmd(o.date) : t.date),
     deadline: (o.deadline != null ? toYmd(o.deadline) : t.deadline),
     items,
-    youkou: t.youkou
+    youkou: t.youkou,
+    place: t.place,
+    address: t.address
   });
 
   await env.DB.prepare('UPDATE taikai SET event_id = ? WHERE org_id = ? AND id = ?')
@@ -618,7 +620,7 @@ function normalizeMembers(raw) {
  *  date/deadline は中では 'YYYY-MM-DD'、外に出すときは GAS版と同じ 'YYYY/MM/DD（曜）'。 */
 async function eventsOf(env, orgId) {
   const r = await env.DB.prepare(
-    'SELECT id, name, date, deadline, items, youkou, closed FROM events WHERE org_id = ?'
+    'SELECT id, name, date, deadline, items, youkou, place, address, closed FROM events WHERE org_id = ?'
   ).bind(orgId).all();
 
   return (r.results || []).map(e => ({
@@ -630,6 +632,8 @@ async function eventsOf(env, orgId) {
     deadlineText: fmtDate(e.deadline),
     items: splitItems(e.items),
     youkou: e.youkou || '',
+    place: e.place || '',
+    address: e.address || '',
     // 手じまい（closed列）と、締切をすぎたかどうか。どちらでも締切扱いにする。
     // ただし**理由は分けて持つ**。主催者の画面で「手で締めた」のか
     // 「日が過ぎた」のかが分からないと、再開できるのかどうか判断できない
@@ -643,7 +647,7 @@ async function eventsOf(env, orgId) {
 /** 行事。新しい順。 */
 async function taikaiOf(env, orgId) {
   const r = await env.DB.prepare(
-    'SELECT id, name, date, deadline, place, items, youkou, event_id, created_at'
+    'SELECT id, name, date, deadline, place, items, youkou, detail, event_id, created_at'
     + ' FROM taikai WHERE org_id = ? ORDER BY created_at DESC, rowid DESC'
   ).bind(orgId).all();
 
@@ -655,6 +659,7 @@ async function taikaiOf(env, orgId) {
     dateText: fmtDate(t.date),
     deadlineText: fmtDate(t.deadline),
     place: t.place || '',
+    address: addressOf(t.detail),
     items: splitItems(t.items),
     itemsRaw: splitItems(t.items),
     youkou: t.youkou || '',
@@ -697,9 +702,10 @@ async function addEventRow(env, orgId, a) {
 
   const id = 'ev' + randomId(8);
   await env.DB.prepare(
-    'INSERT INTO events (org_id,id,name,date,deadline,items,youkou,closed,created_at)'
-    + ' VALUES (?,?,?,?,?,?,?,0,?)'
-  ).bind(orgId, id, a.name, a.date, a.deadline, a.items.join('、'), a.youkou || '', Date.now()).run();
+    'INSERT INTO events (org_id,id,name,date,deadline,items,youkou,place,address,closed,created_at)'
+    + ' VALUES (?,?,?,?,?,?,?,?,?,0,?)'
+  ).bind(orgId, id, a.name, a.date, a.deadline, a.items.join('、'),
+         a.youkou || '', a.place || '', a.address || '', Date.now()).run();
 
   return { ok: true, eventId: id, existing: false };
 }
@@ -771,7 +777,9 @@ async function genderMap(env, orgId) {
 function publicEvent(ev, mine) {
   return {
     id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText,
-    items: ev.items, youkou: ev.youkou, closed: ev.closed, mine: mine || null
+    items: ev.items, youkou: ev.youkou, place: ev.place, address: ev.address,
+    // 地図とカレンダーのボタンを画面側で組み立てるため、生の日付も渡す
+    dateRaw: ev.date, closed: ev.closed, mine: mine || null
   };
 }
 
@@ -864,6 +872,18 @@ function splitItems(v) {
 function toItems(v) {
   if (Array.isArray(v)) return v.map(s => String(s).trim()).filter(Boolean);
   return splitItems(v);
+}
+
+/** 読み取り結果（JSON）から会場の住所を拾う。無ければ空。
+ *  ドロッパーが detail に入れてくる項目名に合わせてある。 */
+function addressOf(detail) {
+  if (!detail) return '';
+  try {
+    const o = JSON.parse(detail);
+    return String(o && (o.kaijo_jusho || o.jusho || o.address) || '').trim();
+  } catch (e) {
+    return '';
+  }
 }
 
 function normUrl(v) {

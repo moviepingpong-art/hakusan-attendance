@@ -1,4 +1,4 @@
-/* 出欠ドロッパー 共通ロジック v1.1
+/* 出欠ドロッパー 共通ロジック v1.2
    - ?s= の中身で呼び先を変える。AKfycb… で始まればGAS版、そうでなければ新API
      （載せ替えの途中。移行が済んだらGAS版の分岐を消す）
    - 参加者の識別は端末ID（localStorageのUUID）。LINE・LIFFには一切依存しない
@@ -195,7 +195,47 @@ var ATTEND = (function () {
   function metaHtml(ev) {
     return (ev.date ? '<div class="meta">📅 開催：' + esc(ev.date) + '</div>' : '')
       + (ev.deadline ? '<div class="meta deadline">⏰ 締切：' + esc(ev.deadline) + dueSuffix(ev.deadline) + '</div>' : '')
-      + (ev.youkou ? '<a class="youkou-link" href="' + esc(ev.youkou) + '" target="_blank" rel="noopener">📄 要項を見る</a>' : '');
+      + (ev.place ? '<div class="meta">📍 会場：' + esc(ev.place) + '</div>' : '');
+  }
+
+  /* ---------- 要項・地図・カレンダー ----------
+     案内文にURLを並べると、長いリンク2本で本文が埋もれて出欠が目立たなくなる。
+     そこで案内文からは外し、**回答画面に本物のボタンとして置く**。
+     参加者はリッチメニュー →（この画面）で、見るものも足すものも揃う。 */
+
+  function mapsUrl(ev) {
+    var q = (ev.address || ev.place || '').trim();
+    return q ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) : '';
+  }
+
+  /** Googleカレンダーの追加画面。日付は終日1日ぶん（YYYYMMDD/翌日）。 */
+  function gcalUrl(ev) {
+    var m = String(ev.dateRaw || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    var start = m[1] + m[2] + m[3];
+    // 終日予定の終わりは「翌日」を渡す決まり。月末をまたぐのでDateに計算させる
+    var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + 1));
+    var end = d.getUTCFullYear()
+      + ('0' + (d.getUTCMonth() + 1)).slice(-2)
+      + ('0' + d.getUTCDate()).slice(-2);
+
+    var p = 'action=TEMPLATE&text=' + encodeURIComponent(ev.name || '')
+      + '&dates=' + start + '/' + end
+      + (ev.place || ev.address ? '&location=' + encodeURIComponent(ev.address || ev.place) : '');
+    return 'https://calendar.google.com/calendar/render?' + p;
+  }
+
+  /** 回答画面に並べるボタン。無いものは出さない。 */
+  function linksHtml(ev) {
+    var b = [];
+    if (ev.youkou) b.push(['📄 要項を見る', ev.youkou]);
+    var mp = mapsUrl(ev); if (mp) b.push(['🗺️ 地図で見る', mp]);
+    var gc = gcalUrl(ev); if (gc) b.push(['📆 カレンダーに追加', gc]);
+    if (!b.length) return '';
+
+    return '<div class="evlinks">' + b.map(function (x) {
+      return '<a class="evlink" href="' + esc(x[1]) + '" target="_blank" rel="noopener">' + x[0] + '</a>';
+    }).join('') + '</div>';
   }
 
   /** 集計パネル（人数のみ・個人名なし） */
@@ -275,6 +315,7 @@ var ATTEND = (function () {
     badge: badge,
     dueSuffix: dueSuffix,
     metaHtml: metaHtml,
+    linksHtml: linksHtml,
     summaryHtml: summaryHtml,
     noteHtml: noteHtml,
     loadingHtml: loadingHtml,
