@@ -10,27 +10,28 @@ LINE・LIFF には依存しません。
 
 ## 考え方
 
-**リンク方式。** [イベントドロッパー](https://app.dropper-tools.com/calendar/)の案内文に
-「🙋 出欠を回答する」リンクを1本足すだけ。配信は各団体がすでに持っている
-LINEグループ・LINE公式アカウント・メール等に任せます。
-このツール自体は **LIFF も LINEログイン も Messaging API も使いません**。
+**主催者の手間をゼロに近づける。** 団体名とメンバーのお名前を入れるだけ。
+表の用意も、アプリの登録も、承認の画面も要りません。**スマホだけで数分**で終わります。
 
-**BYOB（Bring Your Own Backend）。** データは主催者自身のGoogleスプレッドシートにだけ保存されます。
-ランニングコストはゼロで、開発者が他団体の個人情報を預かりません。
+**メニュー方式。** 主催者は3本のURLを1回だけ配れば、あとは増やしません。
+LINE公式アカウントのリッチメニューに貼っておけば、行事が増えても貼り直しは不要です。
 
-参加者の識別は **名簿から名前を選ぶ＋端末記憶**（localStorage の UUID）。最初の1回だけ選べば済みます。
+**参加者はログイン不要。** 名簿から名前を選ぶ＋端末記憶（localStorage の UUID）。
+最初の1回だけ選べば済みます。
 
 ```
 [主催者] 要項PDF
    ↓ ドロップ
 [イベントドロッパー]（別リポジトリ dropper-app）
    ├→ Googleカレンダーに登録
-   ├→「出欠を作る」→ 主催者のGAS → イベント行を追加 → eventId
-   └→ 案内文に「🙋 出欠を回答する」リンクを同梱
-             ↓ 主催者がLINEグループ等に配信
-[参加者] attend/?s={デプロイID}&e={イベントID}
-             ↓ fetch
-[主催者のGASウェブアプリ] → [主催者のスプレッドシート]
+   ├→「🙋 出欠システムに保存」→ 読み取り結果をクリップボードへ
+   └→ 案内文（URLなし。末尾に「メニューの出欠入力から」の1行）
+   ↓ 貼り付け
+[管理画面 attend/admin.html] → 行事に貯める → 「この行事で出欠を作る」
+   ↓
+[参加者] attend/?s={団体ID}
+   ↓ fetch
+[api.dropper-tools.com]（Cloudflare Worker）→ [D1]
 ```
 
 ## ファイル
@@ -40,52 +41,58 @@ LINEグループ・LINE公式アカウント・メール等に任せます。
 | `attend/index.html` | 出欠回答（`e` ありでイベント個別／なしで一覧） | 参加者 |
 | `attend/my.html` | わたしの回答 | 参加者 |
 | `attend/status.html` | 集計閲覧（人数のみ・個人名なし） | だれでも |
-| `attend/setup.html` | テンプレのコピーと、イベントドロッパーへの登録 | 主催者 |
+| `attend/admin.html` | 主催者の管理画面。団体づくり・名簿・行事・出欠・集計・削除 | 主催者 |
+| `attend/setup.html` | `admin.html` への転送だけ（外から張られた古いリンク用） | — |
 | `attend/attend.js` `attend/attend.css` | 共通ロジック・共通スタイル | — |
-| `gas/attendance-api.gs` | GAS本体（doGet / doPost 全action、初期設定メニュー） | 主催者のシートに同梱 |
-| `gas/tally.gs` | `shukei()`。男女別6列＋未回答者名 | 同上 |
-| `gas/setup-ui.html` | 表の中で動くセットアップ画面（団体名・人数分の名簿入力・デプロイ案内・URL発行） | 同上 |
-| `gas/appsscript.json` | マニフェスト。デプロイ画面の「実行：自分／アクセス：全員」を初期値にする | 同上 |
+| `api/src/index.js` | API本体（Cloudflare Worker） | — |
+| `api/schema.sql` `api/migrations/` | D1のテーブル定義と、あとから列を足す指示 | — |
 | `dropper/attendance-hook.js` | イベントドロッパーに貼り込む連携モジュールの原本 | dropper-app へコピー |
 | `index.html` | 案内だけの入口ページ | — |
+| `gas/` | **旧GAS版。使っていません**（下記） | — |
 
 ## URL
 
 ```
-イベント個別： https://app.dropper-tools.com/attend/?s={デプロイID}&e={イベントID}   ← 全体で約125字
-一覧　　　　： https://app.dropper-tools.com/attend/?s={デプロイID}
-わたしの回答： https://app.dropper-tools.com/attend/my.html?s={デプロイID}
-集計　　　　： https://app.dropper-tools.com/attend/status.html?s={デプロイID}
+一覧　　　　： https://app.dropper-tools.com/attend/?s={団体ID}
+イベント個別： https://app.dropper-tools.com/attend/?s={団体ID}&e={イベントID}
+わたしの回答： https://app.dropper-tools.com/attend/my.html?s={団体ID}
+集計　　　　： https://app.dropper-tools.com/attend/status.html?s={団体ID}
+管理　　　　： https://app.dropper-tools.com/attend/admin.html?s={団体ID}#k={合鍵}
 ```
 
-`s` は **GASのデプロイIDだけ**（`…/macros/s/【ここ】/exec`）。URL全体を載せると
-LINEがリンク化できない長さ（実測：237字は可・453字は不可）に入ってしまうためです。
-`s` が露出しても、書き込みキーがなければイベントは作れません。
-
-> デプロイIDの実測は **72字**（2026-08-13）。個別リンクは全体で **125字** になります。
-> 引き継ぎ資料の想定（57字・110字）より長いものの、リンク化できる範囲に収まっています。
+**上の4本は配ってよいもの。管理リンクだけは配ってはいけません。**
+団体IDを知っていれば名簿の氏名は見えます（推測できない長さにしてあります）。
+合鍵は `#` のうしろに置いてあり、サーバーには送られません。
 
 > ⚠ **配るURLの出どころ（オリジン）を混ぜないこと。**
 > 端末の記憶はオリジンごとに別物なので、`app.dropper-tools.com` と `github.io` を混ぜると
 > 回答する人が名前を選び直すことになります。**すべて app.dropper-tools.com に統一してください。**
 
+## データの置き場
+
+**出欠のデータは開発者のCloudflare（D1）に保存されます。**
+以前は主催者自身のGoogleスプレッドシートに置く方式（BYOB）でしたが、
+主催者のセットアップが重すぎたため載せ替えました。経緯は [`docs/backend-plan.md`](docs/backend-plan.md)。
+
+主催者は管理画面の「この団体を削除する」で、いつでも全部消せます。
+
+> シリーズの他の3本（イベント・予定表・決めごと）は**今までどおりブラウザ完結**で、
+> データを預かりません。サーバーを持つのは出欠だけです。
+
 ## ドキュメント
 
-- [セットアップ手順・データ構造・API仕様](docs/setup-guide.md)
+- [API と Worker の手順](api/README.md)
+- [自前バックエンドへの載せ替え計画](docs/backend-plan.md)
 - [イベントドロッパー側の連携](docs/dropper-integration.md)
 - [白山クラブの立ち上げ手順](docs/hakusan-setup.md)
 
-## 使う前に設定するところ
+## 旧GAS版（`gas/`）について
 
-| 場所 | 何を |
-|---|---|
-| `attend/attend.js` の `TEMPLATE_COPY_URL` | 配布用テンプレのコピーURL（空だと `setup.html` が手動手順の案内になる） |
-| `dropper/attendance-hook.js` の `ATTEND_BASE` | `attend/` を公開したURL（dropper-app 側は設定ずみ） |
+主催者ごとにスプレッドシートをコピーし、Apps Script をデプロイして使う方式でした。
+**いまは使っていません。** 参照用に残してあります。
 
-## v1 でやらないこと
-
-ライセンス／課金ゲート、en・in 版への同期、要項PDFのフォーム内表示、プッシュ通知・自動リマインド、
-凝った管理画面（**名簿は表の中のセットアップ画面から、イベントはシートを直接編集する。これは仕様**）。
+参加者ページは `?s=` の中身を見て呼び先を変えます（`AKfycb…` で始まればGAS版）。
+**まだGAS版で動いている団体が無いことを確かめてから**、この分岐と `gas/` を消してください。
 
 ## 旧・白山クラブ専用版について
 
