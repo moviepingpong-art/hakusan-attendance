@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>出欠を回答する</title>
-<link rel="stylesheet" href="attend.css?v=20260819">
+<link rel="stylesheet" href="attend.css?v=20260821">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
 <div class="wrap" id="wrap"></div>
 <p class="foot" id="foot"></p>
 
-<script src="attend.js?v=20260819"></script>
+<script src="attend.js?v=20260821"></script>
 <script>
 (function () {
   'use strict';
@@ -181,8 +181,9 @@
       var pill = !done ? '<span class="status st-none">未回答</span>'
         : (done === ev.items.length ? '<span class="status st-done">回答ずみ</span>'
                                     : '<span class="status st-part">一部だけ回答</span>');
-      // カード全体を <a> で包まないこと。metaHtml が「要項を見る」リンクを含むので
-      // アンカーの入れ子になり、ブラウザが外側の <a> をそこで閉じてしまう。
+      // カード全体を <a> で包まないこと。中にリンクを置くとアンカーの入れ子になり、
+      // ブラウザが外側の <a> をそこで閉じてしまう。
+      // 要項・地図・カレンダーは一覧には出さない（選んだ先の回答画面に置いてある）。
       return '<div class="card evcard">'
         + '<div class="card-head no-border"><h2>' + esc(ev.name) + '</h2>'
         + ATTEND.metaHtml(ev)
@@ -206,6 +207,8 @@
       + ATTEND.metaHtml(ev)
       + (ev.closed ? '<div><span class="badge closed">申込締切をすぎました</span></div>'
                    : (answered ? '<div><span class="status st-done">回答ずみ（変更できます）</span></div>' : ''))
+      // 要項・地図・カレンダーはここに置く。案内文からURLを外したぶんの受け皿
+      + ATTEND.linksHtml(ev)
       + '</div>';
 
     if (ev.closed) {
