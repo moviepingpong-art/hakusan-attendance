@@ -14,6 +14,9 @@
   .tkcard .m{font-size:13.5px; color:var(--sub); margin:4px 0 0;}
   /* ドロッパーから届いた行事。ふつうの行事カードと見分けがつくようにする */
   .tkcard.in{border-color:var(--maru); background:var(--maru-bg);}
+  /* ドロッパーから開いたタブにだけ出す帰り道。押した先で作業が続くので、上に置く */
+  .backbar{max-width:720px; margin:12px auto 0; padding:0 14px;}
+  .backbar .btn{width:auto; padding:9px 16px; font-size:15px;}
   .conn{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 14px;}
   .conn .hint{margin:0 0 10px;}
   .b{display:inline-block; font-size:12px; font-weight:700; border-radius:999px; padding:3px 10px; margin:8px 0 0;}
@@ -43,6 +46,12 @@
   <h1>出欠システムの管理</h1>
   <p id="org"></p>
 </header>
+
+<!-- ドロッパーから開いたときだけ出る。閉じれば、もとのタブがそのまま残っている -->
+<p class="backbar" id="backBar" hidden>
+  <button class="btn sub" id="backGo" type="button">← イベントドロッパーに戻る</button>
+  <span class="hint" id="backMsg"></span>
+</p>
 
 <div class="wiz">
 
@@ -692,6 +701,27 @@
         + '<div class="wiz"><section class="step"><p>この団体のデータはすべて消えました。'
         + '配っていたURLも開けなくなります。</p></section></div>';
     }).catch(function (e) { $('delGo').disabled = false; say($('delMsg'), e.message, 'ng'); });
+  });
+
+  /* ---------- ドロッパーへ帰る ----------
+     この画面はドロッパーが開いた**別のタブ**なので、ブラウザの「戻る」では戻れない。
+     開いた側のタブは案内文もカードも抱えたまま残っているので、**閉じて戻す**のがいちばん近い。
+     自分で開いたタブでないと閉じられないため、opener があるときだけ出す。 */
+  function opener() {
+    try { return window.opener && !window.opener.closed ? window.opener : null; }
+    catch (e) { return null; }   // 別の出どころから開かれていたら触れない
+  }
+
+  if (opener()) show($('backBar'), true);
+
+  $('backGo').addEventListener('click', function () {
+    var o = opener();
+    if (o) { try { o.focus(); } catch (e) { /* noop */ } }
+    window.close();
+    // 閉じさせてもらえない端末がある。そのときのために、行き先を伝えておく
+    setTimeout(function () {
+      $('backMsg').textContent = 'もとの画面に戻りました。このタブは閉じてかまいません。';
+    }, 400);
   });
 
   /* ---------- 入口 ----------
