@@ -16,7 +16,7 @@ routes = [
 [[d1_databases]]
 binding = "DB"
 database_name = "dropper-attendance"
-database_id = "ここに wrangler d1 create の出力を貼る"
+database_id = "633b3955-06e5-472d-a924-91b643d4a424"
 
 # 観測。無料枠の上限に近づいたことに気づけるようにしておく
 [observability]
