@@ -1,6 +1,5 @@
-/* 出欠ドロッパー 共通ロジック v1.3
-   - ?s= の中身で呼び先を変える。AKfycb… で始まればGAS版、そうでなければ新API
-     （載せ替えの途中。移行が済んだらGAS版の分岐を消す）
+/* 出欠ドロッパー 共通ロジック v2.0
+   - ?s= は団体ID。呼び先は api.dropper-tools.com の1本
    - 参加者の識別は端末ID（localStorageのUUID）。LINE・LIFFには一切依存しない
 
    キャッシュ対策：attend.js・attend.css を呼ぶ4本の *.html には ?v=YYYYMMDD を付けてある。
@@ -56,35 +55,21 @@ var ATTEND = (function () {
     return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
   }
 
-  /* ---------- デプロイID ---------- */
-  // 貼り付けられたのが /exec のフルURLでも、IDだけでも受け取れるようにする
-  function parseDeployId(raw) {
-    var s = String(raw == null ? '' : raw).trim();
-    if (!s) return '';
-    var m = s.match(/\/macros\/s\/([A-Za-z0-9_-]+)/);
-    if (m) return m[1];
-    return /^[A-Za-z0-9_-]{20,200}$/.test(s) ? s : '';
-  }
-
-  /* ---------- どちらの出欠システムを呼ぶか ----------
-     載せ替えの途中なので、?s= には2種類が来る。
-       ・GAS版のデプロイID   … かならず AKfycb で始まる70字前後
-       ・新しい団体ID        … api.dropper-tools.com で使う22字
-     GAS版で動いている団体を止めないため、**IDの形を見て呼び分ける**。
-     移行が済んだら、この関数から isGasId のほうを消すだけでよい。 */
+  /* ---------- 団体ID ---------- */
   var API_BASE = 'https://api.dropper-tools.com/';
 
-  function isGasId(id) { return /^AKfycb/.test(id); }
+  function parseOrgId(raw) {
+    var s = String(raw == null ? '' : raw).trim();
+    return /^[A-Za-z0-9_-]{10,200}$/.test(s) ? s : '';
+  }
 
-  function apiUrl(deployId) {
-    var id = parseDeployId(deployId);
-    if (!id) return '';
-    return isGasId(id) ? 'https://script.google.com/macros/s/' + id + '/exec' : API_BASE;
+  function apiUrl(orgId) {
+    return parseOrgId(orgId) ? API_BASE : '';
   }
 
   /* ---------- URLパラメータ ---------- */
   var params = new URLSearchParams(window.location.search);
-  var deployId = parseDeployId(params.get('s'));
+  var orgId = parseOrgId(params.get('s'));
   var eventId = String(params.get('e') || '').trim();
 
   /* ---------- 通信 ---------- */
@@ -103,8 +88,7 @@ var ATTEND = (function () {
       try {
         data = JSON.parse(text);
       } catch (e) {
-        // JSONでない＝出欠システムに届いていない。GAS版だと未デプロイや権限不足のときに
-        // ログイン画面のHTMLが返る。新APIでもリンクが違えば別のものが返る
+        // JSONでない＝出欠システムに届いていない
         throw new Error('出欠システムに接続できませんでした。主催者からもらったリンクをもう一度お確かめください。');
       }
       return data;
@@ -116,33 +100,25 @@ var ATTEND = (function () {
   }
 
   function get(action, extra, id) {
-    var use = parseDeployId(id || deployId);
-    var base = apiUrl(use);
-    if (!base) return Promise.reject(new Error('リンクが正しくありません。'));
-    var q = [];
+    var use = parseOrgId(id || orgId);
+    if (!use) return Promise.reject(new Error('リンクが正しくありません。'));
+    var q = ['s=' + encodeURIComponent(use)];
     if (action) q.push('action=' + encodeURIComponent(action));
-    // GASは自分の表しか見ないが、新APIはどの団体かを毎回伝える必要がある
-    if (!isGasId(use)) q.push('s=' + encodeURIComponent(use));
     var p = extra || {};
     Object.keys(p).forEach(function (k) {
       if (p[k] !== undefined && p[k] !== null && p[k] !== '') q.push(k + '=' + encodeURIComponent(p[k]));
     });
-    return fetchJson(base + (q.length ? '?' + q.join('&') : '')).then(unwrap);
+    return fetchJson(API_BASE + '?' + q.join('&')).then(unwrap);
   }
 
   function post(body, id) {
-    var use = parseDeployId(id || deployId);
-    var base = apiUrl(use);
-    if (!base) return Promise.reject(new Error('リンクが正しくありません。'));
-    var b = body || {};
-    if (!isGasId(use)) {
-      b = JSON.parse(JSON.stringify(b));
-      b.s = use;
-    }
-    return fetchJson(base, {
+    var use = parseOrgId(id || orgId);
+    if (!use) return Promise.reject(new Error('リンクが正しくありません。'));
+    var b = JSON.parse(JSON.stringify(body || {}));
+    b.s = use;
+    return fetchJson(API_BASE, {
       method: 'POST',
-      // GASはCORSプリフライトに応えられないので text/plain で送る。
-      // 新APIも同じ形で受けるので、ここは分けなくてよい（プリフライトが無いぶん1往復速い）
+      // text/plain だとブラウザがプリフライトを飛ばすので1往復ぶん速い
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(b)
     }).then(unwrap);
@@ -272,8 +248,8 @@ var ATTEND = (function () {
   }
 
   /** リンクに ?s= が無いときの案内。true を返したら以降の処理を止める */
-  function requireDeployId(el) {
-    if (deployId) return false;
+  function requireOrgId(el) {
+    if (orgId) return false;
     el.innerHTML = noteHtml(
       'リンクが正しくありません',
       '主催者から届いた「出欠を回答する」のリンクをそのまま開いてください。アドレスの途中を消すと開けません。',
@@ -285,10 +261,10 @@ var ATTEND = (function () {
   return {
     CHOICES: CHOICES,
     API_BASE: API_BASE,
-    deployId: deployId,
+    orgId: orgId,
     eventId: eventId,
     deviceId: deviceId,
-    parseDeployId: parseDeployId,
+    parseOrgId: parseOrgId,
     apiUrl: apiUrl,
     get: get,
     post: post,
@@ -300,7 +276,7 @@ var ATTEND = (function () {
     summaryHtml: summaryHtml,
     noteHtml: noteHtml,
     loadingHtml: loadingHtml,
-    requireDeployId: requireDeployId,
+    requireOrgId: requireOrgId,
     lsGet: lsGet,
     lsSet: lsSet,
     lsDel: lsDel
