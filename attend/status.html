@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>出欠の状況</title>
-<link rel="stylesheet" href="attend.css?v=20260822">
+<link rel="stylesheet" href="attend.css?v=20260823">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
 <div class="wrap" id="wrap"></div>
 <p class="foot">※ 人数のみ表示しています（どなたが回答したかは表示されません）。締切前は途中経過のため変わります。</p>
 
-<script src="attend.js?v=20260822"></script>
+<script src="attend.js?v=20260823"></script>
 <script>
 (function () {
   'use strict';
@@ -28,7 +28,7 @@
   var esc = ATTEND.esc;
 
   $wrap.innerHTML = ATTEND.loadingHtml();
-  if (ATTEND.requireDeployId($wrap)) return;
+  if (ATTEND.requireOrgId($wrap)) return;
 
   document.getElementById('refreshBtn').addEventListener('click', function () { load(true); });
   load(false);
