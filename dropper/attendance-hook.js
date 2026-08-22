@@ -1,7 +1,8 @@
-/* 出欠ドロッパー連携フック v2.0
+/* 出欠ドロッパー連携フック v2.1
    イベントドロッパー（dropper-app の calendar/）に読み込ませて使う小さなモジュール。
 
-     AttendanceHook.saveToken(ev)   読み取った内容を、貼り付け用の文字列にする
+     AttendanceHook.saveToken(ev)   読み取った内容を、受け渡し用の文字列にする
+     AttendanceHook.adminUrl(tk)    その文字列を積んだ、出欠システムの管理画面のURL
      AttendanceHook.available()     使える状態か（この版では常に true）
 
    ★v2 でやめたこと
@@ -12,11 +13,15 @@
      ・端末ごとの設定保存と、iOS Safari の「サイト超えトラッキングを防ぐ」対策
      ・PCとスマホで別々に設定する運用
 
-   が必要だった。読み取った内容をクリップボードに載せて主催者に渡し、
-   表のサイドバーで取り込む形にしたので、これらがまとめて要らなくなった。
+   が必要だった。読み取った内容を主催者に手渡す形にしたので、これらがまとめて要らなくなった。
    **このファイルは通信も保存も一切しない。**
 
-   取り込む側は gas/attendance-api.gs の importTaikai。
+   ★v2.1 受け渡しを「管理画面を開く」に変えた
+   以前はクリップボードに載せ、主催者が管理画面に貼り付けていた。いまは
+   adminUrl() の行き先を開くだけで取り込みまで進む。貼り付けは、
+   ポップアップを止められたときの逃げ道として残してある。
+
+   取り込む側は api/src/index.js の importTaikai。
    符号化の形を変えるときは必ず両方そろえること。
    parser.js は触らないこと。
 */
@@ -61,9 +66,25 @@ var AttendanceHook = (function () {
     }));
   }
 
+  /**
+   * 管理画面のURL。トークンは # のうしろに置く。
+   * **サーバーには送られない**ので、要項の中身がアクセスログに残らない。
+   * 配るURLと同じく app.dropper-tools.com に固定する（端末の記憶は出どころごとに別物のため）。
+   * 試験のときだけ window.ATTEND_ADMIN_URL で行き先を差し替える。
+   * @param {string} token saveToken が返した文字列
+   * @returns {string} 開くべきURL。トークンが空なら空
+   */
+  function adminUrl(token) {
+    if (!token) return '';
+    var base = (typeof window !== 'undefined' && window.ATTEND_ADMIN_URL)
+      || 'https://app.dropper-tools.com/attend/admin.html';
+    return base + '#t=' + token;
+  }
+
   return {
     available: available,
-    saveToken: saveToken
+    saveToken: saveToken,
+    adminUrl: adminUrl
   };
 })();
 
