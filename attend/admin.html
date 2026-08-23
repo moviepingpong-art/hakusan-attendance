@@ -564,16 +564,43 @@
 
   $('tkInLater').addEventListener('click', function () { show($('tkIn'), false); });
 
+  /* 出欠ができたことを、ドロッパーに知らせる。
+     ドロッパーは案内文の「メニューの出欠入力から」を、**これが届いたときだけ**出す。
+     送っただけで受付を始めずに閉じた場合に、案内文が嘘になるのを防ぐため。
+
+     別タブなら opener へ postMessage、同じ画面で来たなら端末に印を置く。
+     **両方いる。** ホーム画面のアプリには opener が無く、ふつうのブラウザは
+     戻っても読み直しが起きない。 */
+  function tellDropper(name, date) {
+    var note = { name: name, date: date, at: Date.now() };
+    store('dropperAttendDone', JSON.stringify(note));
+    var o = opener();
+    if (o) { try { o.postMessage({ type: 'attend-created', name: name, date: date }, location.origin); } catch (e) { /* noop */ } }
+  }
+
   $('tkInGo').addEventListener('click', function () {
     var b = this;
     b.disabled = true;
     b.textContent = '始めています…';
     withKey({ action: 'createEventFromTaikai', taikaiId: b.getAttribute('data-mk') })
       .then(function () {
-        say($('tkInMsg'), '出欠の受付を始めました。参加者の一覧に出ています。', 'ok');
+        var row = null;
+        for (var i = 0; i < tkRows.length; i++) {
+          if (tkRows[i].id === b.getAttribute('data-mk')) row = tkRows[i];
+        }
+        if (row) tellDropper(row.name, row.date);
+
         show($('tkInGo'), false);
         loadTaikai();
         loadEvents();
+
+        // ドロッパーから来たのなら、案内文づくりに戻ってもらう。順番はここで決まる
+        if (backWay) {
+          say($('tkInMsg'), '出欠の受付を始めました。イベントドロッパーに戻ります…', 'ok');
+          setTimeout(goBack, 1400);
+        } else {
+          say($('tkInMsg'), '出欠の受付を始めました。参加者の一覧に出ています。', 'ok');
+        }
       })
       .catch(function (err) {
         b.disabled = false;
@@ -805,7 +832,8 @@
   var backWay = opener() ? 'close' : (fromDropper && history.length > 1 ? 'back' : '');
   if (backWay) show($('backBar'), true);
 
-  $('backGo').addEventListener('click', function () {
+  function goBack() {
+    if (!backWay) return;
     if (backWay === 'back') { history.back(); return; }
 
     var o = opener();
@@ -815,7 +843,9 @@
     setTimeout(function () {
       $('backMsg').textContent = 'もとの画面に戻りました。このタブは閉じてかまいません。';
     }, 400);
-  });
+  }
+
+  $('backGo').addEventListener('click', goBack);
 
   /* ---------- 入口 ----------
      この画面を開いたまま管理リンク（#k=…）を開くと、ブラウザは # だけ差し替えて
