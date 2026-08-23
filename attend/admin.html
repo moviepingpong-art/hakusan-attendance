@@ -162,6 +162,22 @@
       <div id="evList"></div>
     </section>
 
+    <!-- 自分用の管理リンク。ふだんは伏せておく（肩ごしに見られる場所で開くこともある） -->
+    <section class="step">
+      <h2>あなたの管理リンク</h2>
+      <p class="hint">この画面をもう一度開くためのリンクです。<b>人に渡さないでください。</b>
+         渡すと名簿も回答も操作されます。</p>
+      <button class="btn sub wide" id="myShow" type="button">管理リンクを表示する</button>
+      <div id="myBox" hidden style="margin-top:12px;">
+        <div class="urlbox">
+          <div class="t">あなただけのもの</div>
+          <div class="u"><input id="myUrl" type="text" readonly><button class="btn" data-copy="myUrl" type="button">コピー</button></div>
+        </div>
+        <p class="hint">機種を替えたときや、ホーム画面のアプリで使うときは、これをコピーして
+           「すでに団体をお持ちの方」に貼り付けてください。</p>
+      </div>
+    </section>
+
     <!-- 配るURL -->
     <section class="step">
       <h2>みなさんに配るURL</h2>
@@ -436,6 +452,8 @@
     withKey({ action: 'org' }).then(function (d) {
       $('org').textContent = d.org.name;
       $('edOrg').value = d.org.name;
+      // 合鍵はこの端末にしか無い。サーバーは SHA-256 しか持っていないので、組み立てはここで
+      $('myUrl').value = d.urls.admin || (d.urls.list.replace(/\/\?s=/, '/admin.html?s=') + '#k=' + encodeURIComponent(adminKey));
       $('u1').value = d.urls.list;
       $('u2').value = d.urls.my;
       $('u3').value = d.urls.status;
@@ -577,6 +595,12 @@
         + (pasteTry ? '<br>いまは貼り付けて開いています。<b>覚えさせておくと、次からは貼り付けが要りません。</b>' : '');
     $('connGo').textContent = on ? 'この端末から消す' : 'この端末に覚える';
   }
+
+  $('myShow').addEventListener('click', function () {
+    var on = $('myBox').hidden;
+    show($('myBox'), on);
+    this.textContent = on ? '管理リンクを隠す' : '管理リンクを表示する';
+  });
 
   $('connGo').addEventListener('click', function () {
     var on = pick(REM) && pick(REM) === adminKey;
