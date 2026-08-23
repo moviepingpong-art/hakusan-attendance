@@ -84,6 +84,7 @@ GASのような「デプロイを管理→鉛筆→新しいバージョン」�
 
 ```bash
 npx wrangler d1 execute dropper-attendance --remote --file=./migrations/0001-events-place.sql
+npx wrangler d1 execute dropper-attendance --remote --file=./migrations/0002-orgs-lang.sql
 ```
 
 `pull` を忘れるとマイグレーションのファイルがそもそも手元に無く、
@@ -117,6 +118,11 @@ node /path/to/scratchpad/apitest.js
 - ログインが要らないので、**LINEの内蔵ブラウザでも動く**（Googleログインだと弾かれる）
 
 **回答と紐付けは追記式、集計は最新行を採用。** GAS版と同じ。`UPDATE` を書きたくなったら立ち止まる。
+
+**参加者の画面のことばは団体ごと**（`orgs.lang`）。参加者向けの応答には必ず `lang` を載せる。
+画面はそれを見て言語を決める。**エラーはサーバーで訳さない** — `code` を付けて返し、
+訳は `attend/attend.js` の辞書に集める（2か所に散らさないため）。
+`fmtDate(ymd, lang)` は**言語を渡すこと**。渡し忘れると英語の画面に日本語の曜日が出る。
 
 **action名と応答の形はGAS版に合わせてある。** 参加者側の `attend/*.html` は
 URLの組み立てだけ差し替えれば動く。ここを崩すと段階2の手間が増える。
