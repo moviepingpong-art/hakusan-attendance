@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260825">
+<link rel="stylesheet" href="attend.css?v=20260826">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -255,8 +255,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260825"></script>
-<script src="admin-i18n.js?v=20260825"></script>
+<script src="attend.js?v=20260826"></script>
+<script src="admin-i18n.js?v=20260826"></script>
 <script>
 (function () {
   'use strict';
@@ -634,12 +634,22 @@
 
      別タブなら opener へ postMessage、同じ画面で来たなら端末に印を置く。
      **両方いる。** ホーム画面のアプリには opener が無く、ふつうのブラウザは
-     戻っても読み直しが起きない。 */
+     戻っても読み直しが起きない。
+
+     ★ 出欠を入力するURLも一緒に渡す。LINEの無い国では、案内文にこのURLが要る
+     （リッチメニューが無いので、書かないと参加者はどこからも辿り着けない）。
+     団体につき1本で行事が増えても変わらないので、渡すのはこれだけでよい。 */
   function tellDropper(name, date) {
-    var note = { name: name, date: date, at: Date.now() };
+    // 出欠を入力するURL（配る3本の1本目）。load() が入れているので、そこから取る
+    var url = $('u1').value || '';
+    var note = { name: name, date: date, url: url, at: Date.now() };
     store('dropperAttendDone', JSON.stringify(note));
     var o = opener();
-    if (o) { try { o.postMessage({ type: 'attend-created', name: name, date: date }, location.origin); } catch (e) { /* noop */ } }
+    if (o) {
+      try {
+        o.postMessage({ type: 'attend-created', name: name, date: date, url: url }, location.origin);
+      } catch (e) { /* noop */ }
+    }
   }
 
   $('tkInGo').addEventListener('click', function () {
