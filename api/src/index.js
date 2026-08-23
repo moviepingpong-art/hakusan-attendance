@@ -49,12 +49,12 @@ export default {
       if (request.method === 'POST') {
         return json(await handlePost(await readBody(request), env), 200, origin);
       }
-      return json({ ok: false, error: '対応していない呼び出しです。' }, 405, origin);
+      return json(bad('badMethod', '対応していない呼び出しです。'), 405, origin);
 
     } catch (err) {
       // 中身は伏せる。主催者にも参加者にも意味が無く、手がかりを与えるだけなので
       console.error(err && err.stack || err);
-      return json({ ok: false, error: 'サーバーでエラーが起きました。時間をおいてお試しください。' }, 500, origin);
+      return json(bad('serverError', 'サーバーでエラーが起きました。時間をおいてお試しください。'), 500, origin);
     }
   }
 };
@@ -73,7 +73,7 @@ async function handleGet(url, env) {
     case 'myanswers': return await myAnswers(env, p.s, p.d);
     case 'ping':      return await ping(env, p.s);
     default:
-      return { ok: false, error: '対応していない呼び出しです（' + action + '）。' };
+      return bad('badAction', '対応していない呼び出しです（' + action + '）。', { a: action });
   }
 }
 
@@ -98,7 +98,7 @@ async function handlePost(b, env) {
     case 'closeEvent':  return await closeEvent(env, b);
     case 'deleteOrg':   return await deleteOrg(env, b);
     default:
-      return { ok: false, error: '対応していない呼び出しです（' + action + '）。' };
+      return bad('badAction', '対応していない呼び出しです（' + action + '）。', { a: action });
   }
 }
 
@@ -273,16 +273,29 @@ async function answer(env, b) {
 
 /* ============================================================
  *  主催者向け（合鍵が要る）
+ *
+ *  ★ 主催者に見えるエラーも、参加者と同じく **サーバーでは訳さない**。
+ *  `code` を返し、管理画面が `admin-i18n.js` の `err_<code>` で訳す。
+ *  管理画面のことばは主催者の端末ごとなので、サーバーには決められない
+ *  （日本語の主催者が英語の団体を運営することがある）。
+ *  差し込みは `vars`。`error` の日本語は、code を知らない古い画面のための保険。
  * ========================================================== */
+
+/** エラー1件ぶんの形をそろえる。`extra` は needKey / hasEvent などの目印 */
+function bad(code, ja, vars, extra) {
+  const o = { ok: false, code, error: ja };
+  if (vars) o.vars = vars;
+  return extra ? Object.assign(o, extra) : o;
+}
 
 /** 団体をつくる。合鍵を返すのはこの1回だけ。 */
 async function createOrg(env, b) {
   const name = String(b.name == null ? '' : b.name).trim();
-  if (!name) return { ok: false, error: '団体名を入れてください。' };
-  if (name.length > 60) return { ok: false, error: '団体名が長すぎます（60字まで）。' };
+  if (!name) return bad('orgNameEmpty', '団体名を入れてください。');
+  if (name.length > 60) return bad('orgNameLong', '団体名が長すぎます（60字まで）。');
 
   const members = normalizeMembers(b.members);
-  if (members.error) return { ok: false, error: members.error };
+  if (members.code) return members;
 
   const orgId = randomId(16);
   const adminKey = randomId(32);
@@ -317,8 +330,8 @@ async function saveOrg(env, b) {
   if (!org.ok) return org;
 
   const name = String(b.name == null ? '' : b.name).trim();
-  if (!name) return { ok: false, error: '団体名を入れてください。' };
-  if (name.length > 60) return { ok: false, error: '団体名が長すぎます（60字まで）。' };
+  if (!name) return bad('orgNameEmpty', '団体名を入れてください。');
+  if (name.length > 60) return bad('orgNameLong', '団体名が長すぎます（60字まで）。');
 
   const lang = normLang(b.lang == null ? org.row.lang : b.lang);
   await env.DB.prepare('UPDATE orgs SET name = ?, lang = ?, seen_at = ? WHERE id = ?')
@@ -333,8 +346,8 @@ async function saveMembers(env, b) {
   if (!org.ok) return org;
 
   const members = normalizeMembers(b.members);
-  if (members.error) return { ok: false, error: members.error };
-  if (!members.list.length) return { ok: false, error: 'お名前がひとつも入っていません。' };
+  if (members.code) return members;
+  if (!members.list.length) return bad('rosterEmpty', 'お名前がひとつも入っていません。');
 
   await writeMembers(env, org.row.id, members.list);
   await touch(env, org.row.id);
@@ -362,7 +375,7 @@ async function importTaikai(env, b) {
   if (!org.ok) return org;
 
   const raw = String(b.token == null ? '' : b.token).trim();
-  if (!raw) return { ok: false, error: '貼り付ける内容がありません。' };
+  if (!raw) return bad('pasteEmpty', '貼り付ける内容がありません。');
 
   let o = null;
   try {
@@ -371,10 +384,8 @@ async function importTaikai(env, b) {
     o = null;
   }
   if (!o || !o.name) {
-    return {
-      ok: false,
-      error: 'うまく読み取れませんでした。イベントドロッパーの「出欠システムに保存」でコピーした内容を、そのまま貼り付けてください。'
-    };
+    return bad('pasteBad',
+      'うまく読み取れませんでした。イベントドロッパーの「出欠システムに保存」でコピーした内容を、そのまま貼り付けてください。');
   }
 
   return await addTaikaiRow(env, org.row.id, {
@@ -400,11 +411,13 @@ async function createEventFromTaikai(env, b) {
 
   const id = String(b.taikaiId == null ? '' : b.taikaiId).trim();
   const t = (await taikaiOf(env, org.row.id)).find(x => x.id === id);
-  if (!t) return { ok: false, error: 'その行事が見つかりません。一覧を読み込み直してください。' };
+  if (!t) return bad('taikaiNotFound', 'その行事が見つかりません。一覧を読み込み直してください。');
 
   const o = b.override || {};
   let items = (o.items != null) ? toItems(o.items) : t.itemsRaw;
-  if (!items.length) items = ['参加'];
+  // 種目が読み取れなかったときの1つめ。**保存される値**なので、
+  // 主催者の画面のことばではなく、**参加者に見せることば**（団体の設定）で書く
+  if (!items.length) items = [DEFAULT_ITEM[normLang(org.row.lang)]];
 
   const res = await addEventRow(env, org.row.id, {
     name: t.name,
@@ -432,10 +445,11 @@ async function deleteTaikai(env, b) {
 
   const id = String(b.taikaiId == null ? '' : b.taikaiId).trim();
   const t = (await taikaiOf(env, org.row.id)).find(x => x.id === id);
-  if (!t) return { ok: false, error: 'その行事が見つかりません。一覧を読み込み直してください。' };
+  if (!t) return bad('taikaiNotFound', 'その行事が見つかりません。一覧を読み込み直してください。');
 
   if (t.eventId) {
-    return { ok: false, error: 'この行事からは出欠を作ってあります。先に出欠のほうを削除してください。', hasEvent: true };
+    return bad('taikaiHasEvent',
+      'この行事からは出欠を作ってあります。先に出欠のほうを削除してください。', null, { hasEvent: true });
   }
 
   await env.DB.prepare('DELETE FROM taikai WHERE org_id = ? AND id = ?').bind(org.row.id, t.id).run();
@@ -531,7 +545,7 @@ async function deleteOrg(env, b) {
 
   // 押し間違いで消えないように、団体名をそのまま打ってもらう
   if (String(b.confirm == null ? '' : b.confirm).trim() !== org.row.name) {
-    return { ok: false, error: '確認のため、団体名をそのとおりに入力してください。' };
+    return bad('confirmName', '確認のため、団体名をそのとおりに入力してください。');
   }
 
   const id = org.row.id;
@@ -562,6 +576,8 @@ async function findOrg(env, orgId) {
    配るURLは3本のままで、参加者は何も選ばずに自分の団体の言語で開ける。
    知らない値が入っていても、日本語に落として画面が壊れないようにする。 */
 const LANGS = ['ja', 'en', 'in'];
+/** 種目が1つも読み取れなかったときの既定。参加者に見えるので団体の言語で入れる */
+const DEFAULT_ITEM = { ja: '参加', en: 'Attend', in: 'Attend' };
 function normLang(v) {
   const s = String(v == null ? '' : v).trim().toLowerCase();
   return LANGS.indexOf(s) >= 0 ? s : 'ja';
@@ -570,16 +586,15 @@ function normLang(v) {
 /** 合鍵を照合する。生の鍵は保存していないので、ハッシュで引く。 */
 async function authOrg(env, b) {
   const key = String(b && b.adminKey != null ? b.adminKey : '').trim();
-  if (!key) return { ok: false, error: '管理リンクが正しくありません。', needKey: true };
+  if (!key) return bad('keyMissing', '管理リンクが正しくありません。', null, { needKey: true });
 
   const row = await env.DB.prepare('SELECT id, name, tz, lang FROM orgs WHERE admin_hash = ?')
     .bind(await sha256(key)).first();
 
   if (!row) {
-    return {
-      ok: false, needKey: true,
-      error: 'この管理リンクは使えません。主催者ご自身が保存したリンクをお確かめください。'
-    };
+    return bad('keyBad',
+      'この管理リンクは使えません。主催者ご自身が保存したリンクをお確かめください。',
+      null, { needKey: true });
   }
   return { ok: true, row };
 }
@@ -608,11 +623,15 @@ async function writeMembers(env, orgId, list) {
   await env.DB.batch(stmts);
 }
 
-/** 受け取った名簿を整える。同姓同名はここで弾く（あとで本人を特定できなくなるため）。 */
+/** 受け取った名簿を整える。同姓同名はここで弾く（あとで本人を特定できなくなるため）。
+ *  だめだったときは `bad()` の形（`ok:false` と `code`）でそのまま返す。
+ *  呼び出し側は `members.code` を見て、中身を触らずに返す。 */
 function normalizeMembers(raw) {
   if (raw == null) return { list: [] };
-  if (!Array.isArray(raw)) return { error: '名簿の形が正しくありません。' };
-  if (raw.length > MEMBERS_MAX) return { error: '名簿は' + MEMBERS_MAX + '人までです。' };
+  if (!Array.isArray(raw)) return bad('rosterShape', '名簿の形が正しくありません。');
+  if (raw.length > MEMBERS_MAX) {
+    return bad('rosterMax', '名簿は' + MEMBERS_MAX + '人までです。', { n: MEMBERS_MAX });
+  }
 
   const list = [];
   const seen = new Set();
@@ -620,10 +639,14 @@ function normalizeMembers(raw) {
   for (const m of raw) {
     const name = String((m && m.name) == null ? '' : m.name).trim();
     if (!name) continue;
-    if (name.length > 40) return { error: 'お名前が長すぎます（40字まで）：' + name.slice(0, 20) + '…' };
+    if (name.length > 40) {
+      // 長すぎる名前をそのまま出すと画面がはみ出すので、頭だけ見せる
+      const cut = name.slice(0, 20) + '…';
+      return bad('nameLong', 'お名前が長すぎます（40字まで）：' + cut, { name: cut });
+    }
 
     const key = normKey(name);
-    if (seen.has(key)) return { error: '同じお名前が2人います：' + name };
+    if (seen.has(key)) return bad('nameDup', '同じお名前が2人います：' + name, { name });
     seen.add(key);
 
     list.push({
@@ -689,7 +712,7 @@ async function taikaiOf(env, orgId, lang) {
 /** 行事を1行足す。**同じ行事名・同じ開催日は増やさない**（二重に取り込みがちなので） */
 async function addTaikaiRow(env, orgId, a) {
   const name = String(a.name == null ? '' : a.name).trim();
-  if (!name) return { ok: false, error: '行事名が読み取れませんでした。' };
+  if (!name) return bad('taikaiNameEmpty', '行事名が読み取れませんでした。');
 
   const date = toYmd(a.date);
   const dup = (await taikaiOf(env, orgId))

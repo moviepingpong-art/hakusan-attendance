@@ -431,16 +431,26 @@ var ATTEND = (function () {
     }).then(unwrap);
   }
 
+  /** サーバーからのエラーを、画面のことばの Error にする。
+   *  **サーバーは訳さない。** `code` を見てこちらで訳す（訳が無ければ日本語の保険を出す）。
+   *  `vars` は「{n}人まで」「同じお名前：{name}」のような差し込み。
+   *  管理画面も自前の通信からここを呼ぶので、訳の判断は**この1か所**だけにする。 */
+  function errOf(data) {
+    var code = data && data.code;
+    var msg = (code && DICT[lang] && DICT[lang]['err_' + code])
+      ? t('err_' + code, data && data.vars)
+      : ((data && data.error) || t('errServer'));
+    var e = new Error(msg);
+    if (code) e.code = code;
+    // 合鍵そのものが通らなかったのか、を呼び手で見分けるための目印
+    if (data && data.needKey) e.needKey = true;
+    if (data && data.hasEvent) e.hasEvent = true;
+    return e;
+  }
+
   function unwrap(data) {
     if (!data || data.ok !== true) {
-      // サーバーは訳さない。code を見てこちらで訳す（訳が無ければ日本語の保険を出す）
-      var code = data && data.code;
-      var msg = (code && DICT[lang] && DICT[lang]['err_' + code])
-        ? t('err_' + code)
-        : ((data && data.error) || t('errServer'));
-      var e = new Error(msg);
-      if (code) e.code = code;
-      throw e;
+      throw errOf(data);
     }
     // 団体の言語は毎回ついてくる。参加者のページだけ、受け取ってすぐ合わせる
     if (followOrg && data.lang) setLang(data.lang);
@@ -584,6 +594,7 @@ var ATTEND = (function () {
     followOrgLang: followOrgLang,
     browserLang: browserLang,
     addDict: addDict,
+    errOf: errOf,
     setTitle: setTitle,
     applyDom: applyDom,
     lang: function () { return lang; },
