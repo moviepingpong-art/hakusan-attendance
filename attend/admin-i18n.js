@@ -16,7 +16,6 @@ ATTEND.addDict({
     adEvDelAsk2: 'すでに集まった{n}人ぶんの回答も一緒に消えます。',
     adEvDelAsk3: '元に戻せません。よろしいですか。',
     adErrConn: '出欠システムに接続できませんでした。',
-    adErrGeneric: 'エラーが起きました。',
     adDelRow: 'この行を消す',
     adJoin: '、', adSep: '　/　',
     /* 画面ぜんたい */
@@ -134,7 +133,28 @@ ATTEND.addDict({
     adDelNeedName: '団体名を入力してください。',
     adDelAsk: '本当に削除しますか。元に戻せません。',
     adDelDoneT: '削除しました',
-    adDelDoneB: 'この団体のデータはすべて消えました。配っていたURLも開けなくなります。'
+    adDelDoneB: 'この団体のデータはすべて消えました。配っていたURLも開けなくなります。',
+
+    /* サーバーからのエラー。**サーバーは訳さない**ので、code を受けてここで訳す。
+       参加者ぶんの err_* は attend.js の DICT にある（こちらは主催者だけが見るもの） */
+    err_keyMissing: '管理リンクが正しくありません。',
+    err_keyBad: 'この管理リンクは使えません。主催者ご自身が保存したリンクをお確かめください。',
+    err_orgNameEmpty: '団体名を入れてください。',
+    err_orgNameLong: '団体名が長すぎます（60字まで）。',
+    err_rosterEmpty: 'お名前がひとつも入っていません。',
+    err_rosterShape: '名簿の形が正しくありません。',
+    err_rosterMax: '名簿は{n}人までです。',
+    err_nameLong: 'お名前が長すぎます（40字まで）：{name}',
+    err_nameDup: '同じお名前が2人います：{name}',
+    err_pasteEmpty: '貼り付ける内容がありません。',
+    err_pasteBad: 'うまく読み取れませんでした。イベントドロッパーの「出欠システムに保存」でコピーした内容を、そのまま貼り付けてください。',
+    err_taikaiNotFound: 'その行事が見つかりません。一覧を読み込み直してください。',
+    err_taikaiHasEvent: 'この行事からは出欠を作ってあります。先に出欠のほうを削除してください。',
+    err_taikaiNameEmpty: '行事名が読み取れませんでした。',
+    err_confirmName: '確認のため、団体名をそのとおりに入力してください。',
+    err_badMethod: '対応していない呼び出しです。',
+    err_badAction: '対応していない呼び出しです（{a}）。',
+    err_serverError: 'サーバーでエラーが起きました。時間をおいてお試しください。'
   },
 
   en: {
@@ -148,7 +168,6 @@ ATTEND.addDict({
     adEvDelAsk2: 'The {n} answers already collected go with it.',
     adEvDelAsk3: 'This cannot be undone. Are you sure?',
     adErrConn: 'Could not reach the attendance system.',
-    adErrGeneric: 'Something went wrong.',
     adDelRow: 'Remove this row',
     adJoin: ', ', adSep: '  /  ',
     adTitle: 'Attendance admin',
@@ -257,7 +276,26 @@ ATTEND.addDict({
     adDelNeedName: 'Please type the group name.',
     adDelAsk: 'Really delete? This cannot be undone.',
     adDelDoneT: 'Deleted',
-    adDelDoneB: 'Everything for this group is gone. The links you handed out no longer open.'
+    adDelDoneB: 'Everything for this group is gone. The links you handed out no longer open.',
+
+    err_keyMissing: 'That is not a valid organiser link.',
+    err_keyBad: 'This organiser link does not work. Please check the link you saved.',
+    err_orgNameEmpty: 'Please enter a group name.',
+    err_orgNameLong: 'That group name is too long (60 characters max).',
+    err_rosterEmpty: 'No names have been entered.',
+    err_rosterShape: 'The roster is not in the right shape.',
+    err_rosterMax: 'A roster can hold up to {n} people.',
+    err_nameLong: 'That name is too long (40 characters max): {name}',
+    err_nameDup: 'Two people have the same name: {name}',
+    err_pasteEmpty: 'There is nothing to paste.',
+    err_pasteBad: 'That could not be read. Paste exactly what you copied with “Save to attendance” in Event Dropper.',
+    err_taikaiNotFound: 'That event was not found. Please reload the list.',
+    err_taikaiHasEvent: 'Attendance has already been created from this event. Delete the attendance first.',
+    err_taikaiNameEmpty: 'The event name could not be read.',
+    err_confirmName: 'To confirm, please type the group name exactly.',
+    err_badMethod: 'That request is not supported.',
+    err_badAction: 'That request is not supported ({a}).',
+    err_serverError: 'Something went wrong on the server. Please try again in a little while.'
   },
 
   'in': {
@@ -271,7 +309,6 @@ ATTEND.addDict({
     adEvDelAsk2: 'Ab tak ke {n} jawab bhi mit jayenge.',
     adEvDelAsk3: 'Wapas nahi milega. Pakka?',
     adErrConn: 'Attendance system tak nahi pahunche.',
-    adErrGeneric: 'Kuch galat ho gaya.',
     adDelRow: 'Yeh row hatayein',
     adJoin: ', ', adSep: '  /  ',
     adTitle: 'Attendance admin',
@@ -380,6 +417,25 @@ ATTEND.addDict({
     adDelNeedName: 'Group ka naam likhein.',
     adDelAsk: 'Sach mein delete karein? Wapas nahi milega.',
     adDelDoneT: 'Delete ho gaya',
-    adDelDoneB: 'Is group ka sab kuch mit gaya. Bante hue link ab nahi khulenge.'
+    adDelDoneB: 'Is group ka sab kuch mit gaya. Bante hue link ab nahi khulenge.',
+
+    err_keyMissing: 'Yeh organiser link sahi nahi hai.',
+    err_keyBad: 'Yeh organiser link kaam nahi karta. Jo link aapne save kiya tha wo dekh lein.',
+    err_orgNameEmpty: 'Group ka naam likhein.',
+    err_orgNameLong: 'Group ka naam bahut lamba hai (60 characters tak).',
+    err_rosterEmpty: 'Ek bhi naam nahi hai.',
+    err_rosterShape: 'Roster ka format sahi nahi hai.',
+    err_rosterMax: 'Roster mein {n} log tak aa sakte hain.',
+    err_nameLong: 'Yeh naam bahut lamba hai (40 characters tak): {name}',
+    err_nameDup: 'Do logon ka naam ek jaisa hai: {name}',
+    err_pasteEmpty: 'Paste karne ke liye kuch nahi hai.',
+    err_pasteBad: 'Yeh padha nahi ja saka. Event Dropper mein “Save to attendance” se jo copy hua tha, wahi paste karein.',
+    err_taikaiNotFound: 'Yeh event nahi mila. List dobara load karein.',
+    err_taikaiHasEvent: 'Is event se attendance ban chuki hai. Pehle attendance delete karein.',
+    err_taikaiNameEmpty: 'Event ka naam padha nahi ja saka.',
+    err_confirmName: 'Pakka karne ke liye group ka naam waisa hi likhein.',
+    err_badMethod: 'Yeh request support nahi hai.',
+    err_badAction: 'Yeh request support nahi hai ({a}).',
+    err_serverError: 'Server par kuch gadbad ho gayi. Thodi der baad dobara koshish karein.'
   }
 });

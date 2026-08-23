@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260824">
+<link rel="stylesheet" href="attend.css?v=20260825">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -255,8 +255,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260824"></script>
-<script src="admin-i18n.js?v=20260824"></script>
+<script src="attend.js?v=20260825"></script>
+<script src="admin-i18n.js?v=20260825"></script>
 <script>
 (function () {
   'use strict';
@@ -375,11 +375,8 @@
     }).then(function (r) { return r.text(); }).then(function (t) {
       var d;
       try { d = JSON.parse(t); } catch (e) { throw new Error(T('adErrConn')); }
-      if (!d || d.ok !== true) {
-        var err = new Error((d && d.error) || T('adErrGeneric'));
-        err.needKey = !!(d && d.needKey);   // 合鍵そのものが通らなかったのか、を呼び手で見分ける
-        throw err;
-      }
+      // 訳すのは ATTEND.errOf の1か所だけ。needKey などの目印もそこで付く
+      if (!d || d.ok !== true) throw ATTEND.errOf(d);
       return d;
     });
   }
