@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>出欠を回答する</title>
-<link rel="stylesheet" href="attend.css?v=20260823">
+<title data-i18n-title="answerTitle">出欠を回答する</title>
+<link rel="stylesheet" href="attend.css?v=20260824">
 </head>
 <body>
 
 <header>
-  <h1>出欠の回答</h1>
+  <h1 data-i18n="answerHead">出欠の回答</h1>
   <p id="org"></p>
 </header>
 <div class="me" id="me"></div>
@@ -18,7 +18,7 @@
 <div class="wrap" id="wrap"></div>
 <p class="foot" id="foot"></p>
 
-<script src="attend.js?v=20260823"></script>
+<script src="attend.js?v=20260824"></script>
 <script>
 (function () {
   'use strict';
@@ -29,6 +29,7 @@
   var $foot = document.getElementById('foot');
 
   var esc = ATTEND.esc;
+  var T = ATTEND.t;
   var device = ATTEND.deviceId();
   var member = null;          // {name, gender}
   var events = [];            // 表示中のイベント
@@ -65,40 +66,38 @@
   function setOrg(org) {
     if (!org) return;
     $org.textContent = org;
-    document.title = '出欠を回答する｜' + org;
+    ATTEND.setTitle('answerTitle', org);
   }
 
   function fail(err) {
-    $wrap.innerHTML = ATTEND.noteHtml('読み込めませんでした', String(err && err.message || err), true);
+    $wrap.innerHTML = ATTEND.noteHtml(T('failTitle'), String(err && err.message || err), true);
     $wrap.insertAdjacentHTML('beforeend',
-      '<button class="ghost" type="button" id="retry">もう一度読み込む</button>');
+      '<button class="ghost" type="button" id="retry">' + esc(T('retry')) + '</button>');
     document.getElementById('retry').addEventListener('click', load);
   }
 
   /* ===== 初回：名簿から自分の名前を選ぶ ===== */
   function showNamePicker() {
     $me.innerHTML = '';
-    $wrap.innerHTML = ATTEND.loadingHtml('名簿を読み込んでいます…');
+    $wrap.innerHTML = ATTEND.loadingHtml(T('loadingRoster'));
 
     ATTEND.get('members').then(function (data) {
       setOrg(data.org);
       var members = data.members || [];
       if (!members.length) {
-        $wrap.innerHTML = ATTEND.noteHtml('名簿がまだ空です',
-          '主催者がスプレッドシートの「名簿」シートに名前を書くと、ここから選べるようになります。', true);
+        $wrap.innerHTML = ATTEND.noteHtml(T('emptyRosterTitle'), T('emptyRosterBody'), true);
         return;
       }
 
       var html = '<div class="card"><div class="reg">'
-        + '<h2>はじめての方へ</h2>'
-        + '<p class="lead">名簿からあなたのお名前を選んで、「これで登録」を押してください。'
-        + '登録はこの端末で最初の1回だけです。</p>'
+        + '<h2>' + esc(T('firstTitle')) + '</h2>'
+        + '<p class="lead">' + esc(T('firstLead')) + '</p>'
         + '<div class="names" id="names">'
         + members.map(function (m, i) {
             return '<div class="nbtn" data-i="' + i + '" role="button" tabindex="0">' + esc(m.name) + '</div>';
           }).join('')
         + '</div>'
-        + '<button class="reg-confirm" id="regBtn" type="button" disabled>これで登録</button>'
+        + '<button class="reg-confirm" id="regBtn" type="button" disabled>' + esc(T('regBtn')) + '</button>'
         + '<p class="reg-msg" id="regMsg"></p>'
         + '</div></div>';
       $wrap.innerHTML = html;
@@ -124,7 +123,7 @@
         var $msg = document.getElementById('regMsg');
         $btn.disabled = true;
         $msg.className = 'reg-msg';
-        $msg.textContent = '登録しています…';
+        $msg.textContent = T('regBusy');
 
         ATTEND.post({ action: 'register', deviceId: device, name: chosen.name })
           .then(function (res) {
@@ -141,8 +140,10 @@
   }
 
   function renderMe() {
-    $me.innerHTML = '<span><b>' + esc(member.name) + '</b> さんとして回答します</span>'
-      + '<button type="button" class="relink" id="relink">ちがう人です</button>';
+    // 名前は太字にしたいので、文言を名前の前後で割る
+    var as = T('meAs', { name: '\u0000' }).split('\u0000');
+    $me.innerHTML = '<span>' + esc(as[0]) + '<b>' + esc(member.name) + '</b>' + esc(as[1] || '') + '</span>'
+      + '<button type="button" class="relink" id="relink">' + esc(T('relink')) + '</button>';
     document.getElementById('relink').addEventListener('click', function () {
       member = null;
       showNamePicker();
@@ -152,8 +153,7 @@
   /* ===== 回答フォーム ===== */
   function renderEvents() {
     if (!events.length || !events[0]) {
-      $wrap.innerHTML = ATTEND.noteHtml('いま受付中のイベントはありません',
-        '新しいイベントが登録されると、ここに表示されます。');
+      $wrap.innerHTML = ATTEND.noteHtml(T('noEventsTitle'), T('noEventsBody'));
       return;
     }
 
@@ -163,7 +163,7 @@
 
     picks = {};
     $wrap.innerHTML = events.map(cardHtml).join('')
-      + '<a class="ghost" href="?s=' + esc(encodeURIComponent(ATTEND.orgId)) + '">← ほかの予定を見る</a>';
+      + '<a class="ghost" href="?s=' + esc(encodeURIComponent(ATTEND.orgId)) + '">' + esc(T('backList')) + '</a>';
     $foot.textContent = '';
 
     events.forEach(function (ev) {
@@ -178,9 +178,9 @@
     $wrap.innerHTML = events.map(function (ev) {
       var mine = ev.mine || {};
       var done = (ev.items || []).filter(function (it) { return !!mine[it]; }).length;
-      var pill = !done ? '<span class="status st-none">未回答</span>'
-        : (done === ev.items.length ? '<span class="status st-done">回答ずみ</span>'
-                                    : '<span class="status st-part">一部だけ回答</span>');
+      var pill = !done ? '<span class="status st-none">' + esc(T('noAnswer')) + '</span>'
+        : (done === ev.items.length ? '<span class="status st-done">' + esc(T('pillDone')) + '</span>'
+                                    : '<span class="status st-part">' + esc(T('pillPart')) + '</span>');
       // カード全体を <a> で包まないこと。中にリンクを置くとアンカーの入れ子になり、
       // ブラウザが外側の <a> をそこで閉じてしまう。
       // 要項・地図・カレンダーは一覧には出さない（選んだ先の回答画面に置いてある）。
@@ -189,10 +189,10 @@
         + ATTEND.metaHtml(ev)
         + '<div class="evrow">' + pill + '</div>'
         + '</div>'
-        + '<a class="ghost evgo" href="' + esc(eventUrl(ev.id)) + '">回答する ›</a>'
+        + '<a class="ghost evgo" href="' + esc(eventUrl(ev.id)) + '">' + esc(T('goAnswer')) + '</a>'
         + '</div>';
     }).join('');
-    $foot.textContent = '※ 申込締切をすぎたイベントは表示されません。';
+    $foot.textContent = T('footList');
   }
 
   function eventUrl(id) {
@@ -205,16 +205,16 @@
 
     var head = '<div class="card-head"><h2>' + esc(ev.name) + '</h2>'
       + ATTEND.metaHtml(ev)
-      + (ev.closed ? '<div><span class="badge closed">申込締切をすぎました</span></div>'
-                   : (answered ? '<div><span class="status st-done">回答ずみ（変更できます）</span></div>' : ''))
+      + (ev.closed ? '<div><span class="badge closed">' + esc(T('closedBadge')) + '</span></div>'
+                   : (answered ? '<div><span class="status st-done">' + esc(T('doneEditable')) + '</span></div>' : ''))
       // 要項・地図・カレンダーはここに置く。案内文からURLを外したぶんの受け皿
       + ATTEND.linksHtml(ev)
       + '</div>';
 
     if (ev.closed) {
       return '<div class="card" data-id="' + esc(ev.id) + '">' + head
-        + ATTEND.noteHtml('', 'このイベントの受付は終わりました。下の結果だけご覧いただけます。')
-        + '<button class="ghost" type="button" data-sum="' + esc(ev.id) + '">みんなの回答を見る</button>'
+        + ATTEND.noteHtml('', T('closedBody'))
+        + '<button class="ghost" type="button" data-sum="' + esc(ev.id) + '">' + esc(T('showSummary')) + '</button>'
         + '<div class="sumbox" id="sum-' + esc(ev.id) + '"></div>'
         + '</div>';
     }
@@ -223,7 +223,7 @@
       var cur = mine[it] || '';
       return '<div class="item"><div class="name">' + esc(it) + '</div>'
         + '<div class="choices" data-id="' + esc(ev.id) + '" data-item="' + esc(it) + '">'
-        + ATTEND.CHOICES.map(function (c) {
+        + ATTEND.choices().map(function (c) {
             var on = (cur === c.key) ? ' ' + c.cls : '';
             return '<div class="choice' + on + '" data-key="' + c.key + '" data-cls="' + c.cls + '" role="button" tabindex="0">'
               + '<span class="mark">' + c.key + '</span><span class="lab">' + c.lab + '</span></div>';
@@ -233,9 +233,9 @@
 
     return '<div class="card" data-id="' + esc(ev.id) + '">' + head + items
       + '<button class="submit" type="button" data-send="' + esc(ev.id) + '">'
-      + (answered ? 'この内容で送りなおす' : 'この出欠を送信する') + '</button>'
+      + esc(answered ? T('sendAgain') : T('sendNew')) + '</button>'
       + '<p class="card-msg" id="msg-' + esc(ev.id) + '"></p>'
-      + '<button class="ghost" type="button" data-sum="' + esc(ev.id) + '">みんなの回答を見る</button>'
+      + '<button class="ghost" type="button" data-sum="' + esc(ev.id) + '">' + esc(T('showSummary')) + '</button>'
       + '<div class="sumbox" id="sum-' + esc(ev.id) + '"></div>'
       + '</div>';
   }
@@ -271,20 +271,20 @@
     var rest = ev.items.filter(function (it) { return !mine[it]; });
     if (rest.length) {
       $msg.className = 'card-msg ng';
-      $msg.textContent = 'まだ選んでいない種目があります：' + rest.join('、');
+      $msg.textContent = T('needAll', { list: rest.join(ATTEND.lang() === 'ja' ? '、' : ', ') });
       return;
     }
 
     $btn.disabled = true;
     $msg.className = 'card-msg';
-    $msg.textContent = '送信しています…';
+    $msg.textContent = T('sending');
 
     ATTEND.post({ action: 'answer', deviceId: device, eventId: id, answers: mine })
       .then(function (res) {
         $msg.className = 'card-msg ok';
-        $msg.textContent = '✓ 送信しました。締切前なら何度でも直せます。';
+        $msg.textContent = T('sent');
         ev.mine = res.saved || mine;
-        $btn.textContent = 'この内容で送りなおす';
+        $btn.textContent = T('sendAgain');
         $btn.disabled = false;
         if (res.summary) paintSummary(id, res.summary);
       })
@@ -300,12 +300,12 @@
     if (box.dataset.open === '1') {
       box.innerHTML = '';
       box.dataset.open = '';
-      btn.textContent = 'みんなの回答を見る';
+      btn.textContent = T('showSummary');
       return;
     }
-    box.innerHTML = ATTEND.loadingHtml('集計しています…');
+    box.innerHTML = ATTEND.loadingHtml(T('summarizing'));
     box.dataset.open = '1';
-    btn.textContent = '結果を閉じる';
+    btn.textContent = T('hideSummary');
 
     ATTEND.get('summary', { e: id })
       .then(function (res) { paintSummary(id, res.summary); })
@@ -318,10 +318,10 @@
     var box = document.getElementById('sum-' + id);
     if (!box) return;
     box.innerHTML = ATTEND.summaryHtml(sum)
-      + '<p class="unknown" style="padding:0 16px 14px">※ 人数のみ表示しています（どなたが回答したかは表示されません）。</p>';
+      + '<p class="unknown" style="padding:0 16px 14px">' + esc(T('sumNamesNote')) + '</p>';
     box.dataset.open = '1';
     var btn = document.querySelector('[data-sum="' + id + '"]');
-    if (btn) btn.textContent = '結果を閉じる';
+    if (btn) btn.textContent = T('hideSummary');
   }
 })();
 </script>

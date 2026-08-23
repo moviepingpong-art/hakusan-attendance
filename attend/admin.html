@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title>出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260823">
+<link rel="stylesheet" href="attend.css?v=20260824">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -37,6 +37,12 @@
   .btn.warn{background:var(--batsu);}
   /* 消すボタンは、押し間違えないよう他と色を分ける */
   .btn.sub.del-ev, [data-tkdel]{color:var(--batsu); border-color:var(--batsu);}
+  /* 言語の選択。名簿の行のセレクトとは幅の考え方が違うので、別に持つ */
+  /* box-sizing を書かないと、padding と枠のぶんだけ画面からはみ出す（実際に出た） */
+  /* ★ .field select と書かないこと。名簿の行（.mrow）も .field の中にあるので、
+     男女のセレクトまで幅いっぱいに広がって行が画面からはみ出す（実際に出た）。 */
+  .field > select{width:100%; box-sizing:border-box; padding:11px; font-size:16px;
+                border:2px solid var(--line); border-radius:10px; background:#fff; font-family:inherit;}
   [hidden]{display:none !important;}
 </style>
 </head>
@@ -79,6 +85,17 @@
     <div class="field">
       <label for="newOrg">団体名</label>
       <input id="newOrg" type="text" placeholder="例：白山ラージボール卓球クラブ" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="newLang">参加者に見せることば</label>
+      <select id="newLang">
+        <option value="ja">日本語</option>
+        <option value="en">English</option>
+        <option value="in">Hinglish</option>
+      </select>
+      <p class="hint">回答・わたしの回答・集まり具合の3画面がこのことばになります。
+         配るURLは3本のままで、参加者は何も選びません。あとから変えられます。</p>
     </div>
 
     <div class="field">
@@ -204,6 +221,14 @@
         <input id="edOrg" type="text" autocomplete="off">
       </div>
       <div class="field">
+        <label for="edLang">参加者に見せることば</label>
+        <select id="edLang">
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+          <option value="in">Hinglish</option>
+        </select>
+      </div>
+      <div class="field">
         <label>メンバー（備考に「退会」と書くと名簿から外れます）</label>
         <div id="edRows"></div>
         <button class="btn sub" id="edAdd" type="button">＋ 1人ふやす</button>
@@ -227,7 +252,7 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260823"></script>
+<script src="attend.js?v=20260824"></script>
 <script>
 (function () {
   'use strict';
@@ -411,7 +436,7 @@
 
     this.disabled = true;
     say($('newMsg'), 'つくっています…');
-    api({ action: 'createOrg', name: name, members: members }).then(function (d) {
+    api({ action: 'createOrg', name: name, lang: $('newLang').value, members: members }).then(function (d) {
       adminKey = d.adminKey;
       $('keyUrl').value = d.urls.admin;
       showStart(false);
@@ -452,6 +477,7 @@
     withKey({ action: 'org' }).then(function (d) {
       $('org').textContent = d.org.name;
       $('edOrg').value = d.org.name;
+      $('edLang').value = d.org.lang || 'ja';
       // 合鍵はこの端末にしか無い。サーバーは SHA-256 しか持っていないので、組み立てはここで
       $('myUrl').value = d.urls.admin || (d.urls.list.replace(/\/\?s=/, '/admin.html?s=') + '#k=' + encodeURIComponent(adminKey));
       $('u1').value = d.urls.list;
@@ -786,7 +812,7 @@
 
     this.disabled = true;
     say($('edMsg'), '保存しています…');
-    withKey({ action: 'saveOrg', name: name })
+    withKey({ action: 'saveOrg', name: name, lang: $('edLang').value })
       .then(function () { return withKey({ action: 'saveMembers', members: members }); })
       .then(function () {
         $('edSave').disabled = false;

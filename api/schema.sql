@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS orgs (
   admin_hash  TEXT NOT NULL UNIQUE,           -- 管理リンクの合鍵のSHA-256。生の鍵は保存しない
   name        TEXT NOT NULL DEFAULT '出欠',
   tz          TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+  lang        TEXT NOT NULL DEFAULT 'ja',      -- 参加者に配る画面の言語（ja / en / in）
   created_at  INTEGER NOT NULL,
   seen_at     INTEGER NOT NULL                -- 最終アクセス。放置ぶんの自動削除に使う
 );

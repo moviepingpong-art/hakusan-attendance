@@ -105,19 +105,24 @@ async function handlePost(b, env) {
 
 /* ============================================================
  *  参加者向け（合鍵は要らない）
+ *
+ *  ★ 参加者に見えるエラーには `code` を付ける。
+ *  文言の訳は画面側（attend.js の DICT）に集めてあり、**サーバーは訳さない**。
+ *  団体の言語はサーバーも知っているが、ここで訳すと辞書が2か所に散る。
+ *  `error` の日本語は、code を知らない古い画面のための保険。
  * ========================================================== */
 
 async function ping(env, orgId) {
   const org = await findOrg(env, orgId);
   if (!org) return notFoundOrg();
-  return { ok: true, org: org.name, version: API_VERSION };
+  return { ok: true, org: org.name, lang: normLang(org.lang), version: API_VERSION };
 }
 
 async function publicMembers(env, orgId) {
   const org = await findOrg(env, orgId);
   if (!org) return notFoundOrg();
   await touch(env, org.id);
-  return { ok: true, org: org.name, members: await membersOf(env, org.id, false) };
+  return { ok: true, org: org.name, lang: normLang(org.lang), members: await membersOf(env, org.id, false) };
 }
 
 /** 受付中の一覧。締切をすぎたものは出さない（GAS版と同じ） */
@@ -128,11 +133,11 @@ async function listEvents(env, orgId, deviceId) {
 
   const me = await linkOf(env, org.id, deviceId);
   const mine = me ? await latestOfName(env, org.id, me.name) : {};
-  const events = (await eventsOf(env, org.id))
+  const events = (await eventsOf(env, org.id, org.lang))
     .filter(ev => !ev.closed)
     .map(ev => publicEvent(ev, mine[ev.id] || null));
 
-  return { ok: true, org: org.name, member: me, events };
+  return { ok: true, org: org.name, lang: normLang(org.lang), member: me, events };
 }
 
 /** イベント1件。**締切後でも返す**（フォーム側で締切表示にするため） */
@@ -141,13 +146,13 @@ async function getEvent(env, orgId, eventId, deviceId) {
   if (!org) return notFoundOrg();
   await touch(env, org.id);
 
-  const ev = await findEvent(env, org.id, eventId);
+  const ev = await findEvent(env, org.id, eventId, org.lang);
   if (!ev) return notFoundEvent();
 
   const me = await linkOf(env, org.id, deviceId);
   const mine = me ? ((await latestOfName(env, org.id, me.name))[ev.id] || null) : null;
 
-  return { ok: true, org: org.name, member: me, event: publicEvent(ev, mine) };
+  return { ok: true, org: org.name, lang: normLang(org.lang), member: me, event: publicEvent(ev, mine) };
 }
 
 /** 端末IDから登録ずみの本人を返す */
@@ -156,7 +161,7 @@ async function whoami(env, orgId, deviceId) {
   if (!org) return notFoundOrg();
 
   const me = await linkOf(env, org.id, deviceId);
-  return { ok: true, org: org.name, registered: !!me, member: me };
+  return { ok: true, org: org.name, lang: normLang(org.lang), registered: !!me, member: me };
 }
 
 /** e があればその1件、なければ全イベントの集計。**人数のみで個人名は出さない**
@@ -168,11 +173,11 @@ async function summaryAction(env, orgId, eventId) {
 
   let evs;
   if (String(eventId == null ? '' : eventId).trim()) {
-    const ev = await findEvent(env, org.id, eventId);
+    const ev = await findEvent(env, org.id, eventId, org.lang);
     if (!ev) return notFoundEvent();
     evs = [ev];
   } else {
-    evs = (await eventsOf(env, org.id)).slice().reverse().slice(0, 50);
+    evs = (await eventsOf(env, org.id, org.lang)).slice().reverse().slice(0, 50);
   }
 
   const genders = await genderMap(env, org.id);
@@ -181,7 +186,7 @@ async function summaryAction(env, orgId, eventId) {
     summaries.push(summaryOf(ev, await latestOfEvent(env, org.id, ev.id), genders));
   }
 
-  return { ok: true, org: org.name, summaries, summary: summaries[0] || null };
+  return { ok: true, org: org.name, lang: normLang(org.lang), summaries, summary: summaries[0] || null };
 }
 
 /** 締切前の各イベントについて、その端末の最新回答 */
@@ -193,7 +198,7 @@ async function myAnswers(env, orgId, deviceId) {
   const me = await linkOf(env, org.id, deviceId);
   const mine = me ? await latestOfName(env, org.id, me.name) : {};
 
-  const list = (await eventsOf(env, org.id)).filter(ev => !ev.closed).map(ev => {
+  const list = (await eventsOf(env, org.id, org.lang)).filter(ev => !ev.closed).map(ev => {
     const ans = mine[ev.id] || null;
     const items = ev.items.map(it => ({ name: it, answer: (ans && ans[it]) || '' }));
     const done = items.filter(x => !!x.answer).length;
@@ -203,7 +208,7 @@ async function myAnswers(env, orgId, deviceId) {
     };
   });
 
-  return { ok: true, org: org.name, member: me, registered: !!me, myanswers: list };
+  return { ok: true, org: org.name, lang: normLang(org.lang), member: me, registered: !!me, myanswers: list };
 }
 
 /** 名簿から名前を選んで端末を紐付ける。上書きせず追記し、いちばん新しい行を採用する */
@@ -213,11 +218,11 @@ async function register(env, b) {
 
   const deviceId = String(b.deviceId == null ? '' : b.deviceId).trim();
   const name = String(b.name == null ? '' : b.name).trim();
-  if (!deviceId) return { ok: false, error: '端末IDがありません。ブラウザを更新してからもう一度お試しください。' };
-  if (!name) return { ok: false, error: 'お名前が選ばれていません。' };
+  if (!deviceId) return { ok: false, code: 'noDevice', error: '端末IDがありません。ブラウザを更新してからもう一度お試しください。' };
+  if (!name) return { ok: false, code: 'noName', error: 'お名前が選ばれていません。' };
 
   const mem = (await membersOf(env, org.id, false)).find(m => normKey(m.name) === normKey(name));
-  if (!mem) return { ok: false, error: '名簿にないお名前です。主催者にご確認ください。', notInRoster: true };
+  if (!mem) return { ok: false, code: 'notInRoster', error: '名簿にないお名前です。主催者にご確認ください。', notInRoster: true };
 
   await env.DB.prepare(
     'INSERT INTO links (org_id, device_id, name, gender, created_at) VALUES (?, ?, ?, ?, ?)'
@@ -234,11 +239,11 @@ async function answer(env, b) {
 
   const deviceId = String(b.deviceId == null ? '' : b.deviceId).trim();
   const me = await linkOf(env, org.id, deviceId);
-  if (!me) return { ok: false, error: '先にお名前の登録が必要です。', needRegister: true };
+  if (!me) return { ok: false, code: 'needRegister', error: '先にお名前の登録が必要です。', needRegister: true };
 
-  const ev = await findEvent(env, org.id, b.eventId);
+  const ev = await findEvent(env, org.id, b.eventId, org.lang);
   if (!ev) return notFoundEvent();
-  if (ev.closed) return { ok: false, error: 'このイベントは申込締切をすぎています。', closed: true };
+  if (ev.closed) return { ok: false, code: 'eventClosed', error: 'このイベントは申込締切をすぎています。', closed: true };
 
   const given = b.answers || {};
   const clean = {};
@@ -254,7 +259,7 @@ async function answer(env, b) {
     clean[it] = mark;
     stmts.push(ins.bind(org.id, ev.id, me.name, it, mark, deviceId, now));
   }
-  if (!stmts.length) return { ok: false, error: '回答が選ばれていません。' };
+  if (!stmts.length) return { ok: false, code: 'noAnswers', error: '回答が選ばれていません。' };
 
   await env.DB.batch(stmts);
   await touch(env, org.id);
@@ -283,13 +288,15 @@ async function createOrg(env, b) {
   const adminKey = randomId(32);
   const now = Date.now();
 
+  const lang = normLang(b.lang);
+
   await env.DB.prepare(
-    'INSERT INTO orgs (id, admin_hash, name, tz, created_at, seen_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(orgId, await sha256(adminKey), name, 'Asia/Tokyo', now, now).run();
+    'INSERT INTO orgs (id, admin_hash, name, tz, lang, created_at, seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).bind(orgId, await sha256(adminKey), name, 'Asia/Tokyo', lang, now, now).run();
 
   await writeMembers(env, orgId, members.list);
 
-  return { ok: true, orgId, adminKey, org: name, members: members.list, urls: urlsFor(orgId, adminKey) };
+  return { ok: true, orgId, adminKey, org: name, lang, members: members.list, urls: urlsFor(orgId, adminKey) };
 }
 
 /** 管理リンクを開いたときの一式。合鍵の確認も兼ねる。 */
@@ -299,7 +306,7 @@ async function orgHome(env, b) {
 
   return {
     ok: true,
-    org: { id: org.row.id, name: org.row.name, tz: org.row.tz },
+    org: { id: org.row.id, name: org.row.name, tz: org.row.tz, lang: normLang(org.row.lang) },
     members: await membersOf(env, org.row.id, true),
     urls: urlsFor(org.row.id, String(b.adminKey || ''))
   };
@@ -313,10 +320,11 @@ async function saveOrg(env, b) {
   if (!name) return { ok: false, error: '団体名を入れてください。' };
   if (name.length > 60) return { ok: false, error: '団体名が長すぎます（60字まで）。' };
 
-  await env.DB.prepare('UPDATE orgs SET name = ?, seen_at = ? WHERE id = ?')
-    .bind(name, Date.now(), org.row.id).run();
+  const lang = normLang(b.lang == null ? org.row.lang : b.lang);
+  await env.DB.prepare('UPDATE orgs SET name = ?, lang = ?, seen_at = ? WHERE id = ?')
+    .bind(name, lang, Date.now(), org.row.id).run();
 
-  return { ok: true, org: name };
+  return { ok: true, org: name, lang };
 }
 
 /** 名簿はまるごと入れ替える。回答は氏名で持っているので、名前を直しても過去の回答は消えない。 */
@@ -545,7 +553,16 @@ async function deleteOrg(env, b) {
 async function findOrg(env, orgId) {
   const id = String(orgId == null ? '' : orgId).trim();
   if (!id) return null;
-  return await env.DB.prepare('SELECT id, name, tz FROM orgs WHERE id = ?').bind(id).first();
+  return await env.DB.prepare('SELECT id, name, tz, lang FROM orgs WHERE id = ?').bind(id).first();
+}
+
+/* 参加者に配る画面の言語。**団体ごとに1つ**。
+   配るURLは3本のままで、参加者は何も選ばずに自分の団体の言語で開ける。
+   知らない値が入っていても、日本語に落として画面が壊れないようにする。 */
+const LANGS = ['ja', 'en', 'in'];
+function normLang(v) {
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  return LANGS.indexOf(s) >= 0 ? s : 'ja';
 }
 
 /** 合鍵を照合する。生の鍵は保存していないので、ハッシュで引く。 */
@@ -553,7 +570,7 @@ async function authOrg(env, b) {
   const key = String(b && b.adminKey != null ? b.adminKey : '').trim();
   if (!key) return { ok: false, error: '管理リンクが正しくありません。', needKey: true };
 
-  const row = await env.DB.prepare('SELECT id, name, tz FROM orgs WHERE admin_hash = ?')
+  const row = await env.DB.prepare('SELECT id, name, tz, lang FROM orgs WHERE admin_hash = ?')
     .bind(await sha256(key)).first();
 
   if (!row) {
@@ -618,7 +635,7 @@ function normalizeMembers(raw) {
 
 /** イベント。日付の早い順。締切ずみかどうかもここで決める。
  *  date/deadline は中では 'YYYY-MM-DD'、外に出すときは GAS版と同じ 'YYYY/MM/DD（曜）'。 */
-async function eventsOf(env, orgId) {
+async function eventsOf(env, orgId, lang) {
   const r = await env.DB.prepare(
     'SELECT id, name, date, deadline, items, youkou, place, address, closed FROM events WHERE org_id = ?'
   ).bind(orgId).all();
@@ -628,8 +645,8 @@ async function eventsOf(env, orgId) {
     name: e.name,
     date: e.date || '',
     deadline: e.deadline || '',
-    dateText: fmtDate(e.date),
-    deadlineText: fmtDate(e.deadline),
+    dateText: fmtDate(e.date, lang),
+    deadlineText: fmtDate(e.deadline, lang),
     items: splitItems(e.items),
     youkou: e.youkou || '',
     place: e.place || '',
@@ -645,7 +662,7 @@ async function eventsOf(env, orgId) {
 }
 
 /** 行事。新しい順。 */
-async function taikaiOf(env, orgId) {
+async function taikaiOf(env, orgId, lang) {
   const r = await env.DB.prepare(
     'SELECT id, name, date, deadline, place, items, youkou, detail, event_id, created_at'
     + ' FROM taikai WHERE org_id = ? ORDER BY created_at DESC, rowid DESC'
@@ -656,8 +673,8 @@ async function taikaiOf(env, orgId) {
     name: t.name,
     date: t.date || '',
     deadline: t.deadline || '',
-    dateText: fmtDate(t.date),
-    deadlineText: fmtDate(t.deadline),
+    dateText: fmtDate(t.date, lang),
+    deadlineText: fmtDate(t.deadline, lang),
     place: t.place || '',
     address: addressOf(t.detail),
     items: splitItems(t.items),
@@ -715,10 +732,10 @@ function pendingNames(roster, byName) {
   return roster.filter(m => !byName[normKey(m.name)]).map(m => m.name);
 }
 
-async function findEvent(env, orgId, eventId) {
+async function findEvent(env, orgId, eventId, lang) {
   const id = String(eventId == null ? '' : eventId).trim();
   if (!id) return null;
-  return (await eventsOf(env, orgId)).find(ev => ev.id === id) || null;
+  return (await eventsOf(env, orgId, lang)).find(ev => ev.id === id) || null;
 }
 
 /** 端末IDから本人。追記式なので**いちばん新しい行**を採る。
@@ -811,6 +828,7 @@ function zero() { return { m: 0, f: 0, u: 0 }; }
 function notFoundEvent() {
   return {
     ok: false, notFound: true,
+    code: 'eventNotFound',
     error: 'イベントが見つかりません。主催者からもらったリンクをもう一度お確かめください。'
   };
 }
@@ -835,6 +853,7 @@ function urlsFor(orgId, adminKey) {
 function notFoundOrg() {
   return {
     ok: false, notFound: true,
+    code: 'orgNotFound',
     error: 'この出欠は見つかりませんでした。主催者からもらったリンクをもう一度お確かめください。'
   };
 }
@@ -900,19 +919,28 @@ function toYmd(v) {
   return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
 }
 
-/** 画面に出す形。**GAS版と同じ 'YYYY/MM/DD（曜）' にそろえること。**
+/** 画面に出す形。**区切りは必ずスラッシュ。**
  *  参加者ページの「あと2日」表示がスラッシュ区切りを前提に書かれているので、
- *  ここを 'YYYY-MM-DD' のまま返すと締切の注意が出なくなる。 */
-function fmtDate(ymd) {
+ *  ここを 'YYYY-MM-DD' のまま返すと締切の注意が出なくなる。
+ *
+ *  曜日は団体の言語で書く。日本語だけ全角の括弧（GAS版からの見た目をそのまま）。
+ *  **lang を渡し忘れると日本語の曜日が英語の画面に出る**ので、呼ぶ側で必ず渡すこと。 */
+function fmtDate(ymd, lang) {
   const s = String(ymd == null ? '' : ymd).trim();
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return s;
   // 曜日はUTCで組み立てて求める。実行環境の時計に左右されないため
   const w = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
-  return m[1] + '/' + m[2] + '/' + m[3] + '（' + WDAY[w] + '）';
+  const ymdText = m[1] + '/' + m[2] + '/' + m[3];
+  const l = normLang(lang);
+  return l === 'ja' ? ymdText + '（' + WDAY.ja[w] + '）'
+                    : ymdText + ' (' + WDAY.en[w] + ')';
 }
 
-const WDAY = ['日', '月', '火', '水', '木', '金', '土'];
+const WDAY = {
+  ja: ['日', '月', '火', '水', '木', '金', '土'],
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+};
 
 /** base64url を戻す。ドロッパーの b64url_ と対。 */
 function fromB64url(s) {
