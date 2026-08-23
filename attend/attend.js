@@ -258,6 +258,38 @@ var ATTEND = (function () {
 
   var lang = DEFAULT_LANG;
 
+  /* 応答に載ってくる団体の言語に合わせるかどうか。
+     **参加者のページだけ true。** 管理画面は主催者自身のことばで出すので false にする
+     （日本語の主催者が英語の団体を運営することがある）。 */
+  var followOrg = true;
+  function followOrgLang(on) { followOrg = !!on; }
+
+  /** 画面のことばを直に決める（団体の設定とは切り離す）。管理画面が使う */
+  function setUiLang(l) {
+    var next = DICT[l] ? l : DEFAULT_LANG;
+    if (next === lang) { applyDom(); return next; }
+    lang = next;
+    applyDom();
+    return next;
+  }
+
+  /** ブラウザのことば。**参加者のページでは使わない**（日本の団体に英語の端末で入る人がいる） */
+  function browserLang() {
+    var l = String((navigator.language || '')).toLowerCase();
+    if (l.indexOf('ja') === 0) return 'ja';
+    if (l.indexOf('hi') === 0) return 'in';
+    return 'en';
+  }
+
+  /** ほかの画面ぶんの辞書を足す。管理画面のことばは参加者に配らない（重くなるため別ファイル） */
+  function addDict(more) {
+    Object.keys(more || {}).forEach(function (l) {
+      if (!DICT[l]) DICT[l] = {};
+      var src = more[l];
+      Object.keys(src).forEach(function (k) { DICT[l][k] = src[k]; });
+    });
+  }
+
   function t(key, vars) {
     var d = DICT[lang] || DICT[DEFAULT_LANG];
     var v = d[key];
@@ -274,6 +306,10 @@ var ATTEND = (function () {
     var box = root || document;
     Array.prototype.forEach.call(box.querySelectorAll('[data-i18n]'), function (el) {
       el.textContent = t(el.getAttribute('data-i18n'));
+    });
+    // 入力欄の見本（placeholder）も差し替える
+    Array.prototype.forEach.call(box.querySelectorAll('[data-i18n-ph]'), function (el) {
+      el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph')));
     });
     var head = document.querySelector('[data-i18n-title]');
     if (head) document.title = t(head.getAttribute('data-i18n-title'));
@@ -406,8 +442,8 @@ var ATTEND = (function () {
       if (code) e.code = code;
       throw e;
     }
-    // 団体の言語は毎回ついてくる。**受け取ったらすぐ合わせる**
-    if (data.lang) setLang(data.lang);
+    // 団体の言語は毎回ついてくる。参加者のページだけ、受け取ってすぐ合わせる
+    if (followOrg && data.lang) setLang(data.lang);
     return data;
   }
 
@@ -544,6 +580,10 @@ var ATTEND = (function () {
     choices: choices,
     t: t,
     setLang: setLang,
+    setUiLang: setUiLang,
+    followOrgLang: followOrgLang,
+    browserLang: browserLang,
+    addDict: addDict,
     setTitle: setTitle,
     applyDom: applyDom,
     lang: function () { return lang; },

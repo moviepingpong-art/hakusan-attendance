@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<title>出欠システムの管理</title>
+<title data-i18n-title="adTitle">出欠システムの管理</title>
 <link rel="stylesheet" href="attend.css?v=20260824">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
@@ -43,19 +43,33 @@
      男女のセレクトまで幅いっぱいに広がって行が画面からはみ出す（実際に出た）。 */
   .field > select{width:100%; box-sizing:border-box; padding:11px; font-size:16px;
                 border:2px solid var(--line); border-radius:10px; background:#fff; font-family:inherit;}
+  .uilang{max-width:720px; margin:10px auto 0; padding:0 14px; display:flex; gap:8px;
+          align-items:center; justify-content:flex-end; font-size:13px; color:var(--sub);}
+  .uilang select{padding:6px 8px; font-size:14px; border:1px solid var(--line);
+                 border-radius:8px; background:#fff; font-family:inherit;}
   [hidden]{display:none !important;}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>出欠システムの管理</h1>
+  <h1 data-i18n="adTitle">出欠システムの管理</h1>
   <p id="org"></p>
 </header>
 
+<!-- 画面のことば。**参加者に見せることばとは別物**（日本語の主催者が英語の団体を持つことがある） -->
+<p class="uilang">
+  <label for="uiLang" data-i18n="adUiLang">画面のことば</label>
+  <select id="uiLang">
+    <option value="ja">日本語</option>
+    <option value="en">English</option>
+    <option value="in">Hinglish</option>
+  </select>
+</p>
+
 <!-- ドロッパーから開いたときだけ出る。閉じれば、もとのタブがそのまま残っている -->
 <p class="backbar" id="backBar" hidden>
-  <button class="btn sub" id="backGo" type="button">← イベントドロッパーに戻る</button>
+  <button class="btn sub" id="backGo" type="button" data-i18n="adBack">← イベントドロッパーに戻る</button>
   <span class="hint" id="backMsg"></span>
 </p>
 
@@ -64,63 +78,55 @@
   <!-- 合鍵つきのリンクで来ていないとき。まず「すでにお持ちの方」を見せる。
        ここを飛ばして下でつくられると、団体が二重になって配ったURLが古いほうを指したままになる -->
   <section class="step" id="haveScreen" hidden>
-    <h2>すでに団体をお持ちの方</h2>
-    <p class="hint">管理リンクを貼り付けると、この画面のまま開けます。
-       ホーム画面に登録したアプリからは、LINEやメールのリンクを押しても
-       <b>別のブラウザで開いてしまう</b>ので、こちらからどうぞ。</p>
+    <h2 data-i18n="adHaveTitle">すでに団体をお持ちの方</h2>
+    <p class="hint" data-i18n="adHaveLead"></p>
     <div class="field">
-      <label for="haveKey">管理リンク</label>
+      <label for="haveKey" data-i18n="adHaveLabel">管理リンク</label>
       <input id="haveKey" type="text" inputmode="url" autocomplete="off"
              placeholder="https://app.dropper-tools.com/attend/admin.html?s=…#k=…">
     </div>
     <p class="msg" id="haveMsg"></p>
-    <button class="btn wide" id="haveGo" type="button">この管理リンクで開く</button>
+    <button class="btn wide" id="haveGo" type="button" data-i18n="adHaveGo">この管理リンクで開く</button>
   </section>
 
   <section class="step" id="newScreen" hidden>
-    <h2><span class="num">1</span>団体をつくる</h2>
-    <p class="hint"><b>すでに団体をお持ちの方は、ここでつくらないでください。</b>
-       別の団体になり、配ったURLは古いほうを指したままになります。上の欄をお使いください。</p>
+    <h2><span class="num">1</span><span data-i18n="adNewTitle">団体をつくる</span></h2>
+    <p class="hint" data-i18n="adNewWarn"></p>
 
     <div class="field">
-      <label for="newOrg">団体名</label>
-      <input id="newOrg" type="text" placeholder="例：白山ラージボール卓球クラブ" autocomplete="off">
+      <label for="newOrg" data-i18n="adOrgName">団体名</label>
+      <input id="newOrg" type="text" data-i18n-ph="adOrgNamePh" placeholder="例：白山ラージボール卓球クラブ" autocomplete="off">
     </div>
 
     <div class="field">
-      <label for="newLang">参加者に見せることば</label>
+      <label for="newLang" data-i18n="adOrgLang">参加者に見せることば</label>
       <select id="newLang">
         <option value="ja">日本語</option>
         <option value="en">English</option>
         <option value="in">Hinglish</option>
       </select>
-      <p class="hint">回答・わたしの回答・集まり具合の3画面がこのことばになります。
-         配るURLは3本のままで、参加者は何も選びません。あとから変えられます。</p>
+      <p class="hint" data-i18n="adOrgLangHint"></p>
     </div>
 
     <div class="field">
-      <label>メンバー</label>
+      <label data-i18n="adMembers">メンバー</label>
       <div id="newRows"></div>
-      <button class="btn sub" id="newAdd" type="button">＋ 1人ふやす</button>
+      <button class="btn sub" id="newAdd" type="button" data-i18n="adAddOne">＋ 1人ふやす</button>
     </div>
 
     <p class="msg" id="newMsg"></p>
-    <button class="btn wide" id="newGo" type="button">この内容でつくる</button>
+    <button class="btn wide" id="newGo" type="button" data-i18n="adCreate">この内容でつくる</button>
   </section>
 
   <!-- つくった直後。合鍵を見せるのはここ1回だけ -->
   <section class="step done" id="keyScreen" hidden>
-    <h2>できあがりました</h2>
-    <div class="warn">
-      <b>下の「管理リンク」を必ず保存してください。</b><br>
-      これがあなたの合鍵です。この画面を閉じると二度と表示できず、<b>なくすと元に戻せません。</b><br>
-      ブックマークに入れるか、自分あてにメッセージで送っておくのが確実です。
-    </div>
+    <h2 data-i18n="adDoneTitle">できあがりました</h2>
+    <div class="warn" id="keyWarn"></div>
     <div class="urlbox">
-      <div class="t">管理リンク（あなただけのもの。人に渡さないでください）</div>
-      <div class="u"><input id="keyUrl" type="text" readonly><button class="btn" data-copy="keyUrl" type="button">コピー</button></div>
+      <div class="t" data-i18n="adKeyBoxT">管理リンク（あなただけのもの。人に渡さないでください）</div>
+      <div class="u"><input id="keyUrl" type="text" readonly><button class="btn" data-copy="keyUrl" type="button" data-i18n="adCopy">コピー</button></div>
     </div>
-    <button class="btn wide" id="keyGo" type="button" style="margin-top:16px;">保存しました。管理画面へ</button>
+    <button class="btn wide" id="keyGo" type="button" style="margin-top:16px;" data-i18n="adKeyGo">保存しました。管理画面へ</button>
   </section>
 
   <!-- ふだん使う画面 -->
@@ -128,15 +134,15 @@
 
     <!-- 行事 -->
     <section class="step">
-      <h2>行事から出欠を作る</h2>
+      <h2 data-i18n="adTkTitle">行事から出欠を作る</h2>
 
       <!-- ドロッパーから届いた行事。#t= で開いたときだけ出る -->
       <div class="tkcard in" id="tkIn" hidden>
-        <div class="n" id="tkInName">イベントドロッパーから届きました</div>
+        <div class="n" id="tkInName" data-i18n="adTkFrom">イベントドロッパーから届きました</div>
         <div class="m" id="tkInMeta"></div>
         <p class="msg" id="tkInMsg"></p>
-        <button class="btn wide" id="tkInGo" type="button" hidden>この内容で出欠を受け付ける</button>
-        <button class="btn sub wide" id="tkInLater" type="button" style="margin-top:8px;">とじる</button>
+        <button class="btn wide" id="tkInGo" type="button" hidden data-i18n="adTkAccept">この内容で出欠を受け付ける</button>
+        <button class="btn sub wide" id="tkInLater" type="button" style="margin-top:8px;" data-i18n="adTkClose">とじる</button>
       </div>
 
       <!-- ドロッパーとつなぐ（合鍵をこの端末に覚えるかどうか） -->
@@ -145,16 +151,15 @@
         <button class="btn sub" id="connGo" type="button">この端末に覚える</button>
       </div>
 
-      <p>イベントドロッパーの「🙋 出欠システムに保存」から、この画面が開いて取り込まれます。</p>
+      <p data-i18n="adTkLead"></p>
       <p class="msg" id="tkMsg"></p>
 
       <!-- 貼り付けは、タブが開かなかったときの逃げ道。ふだんは畳んでおく -->
       <button class="btn sub wide" id="tkPasteBtn" type="button">この画面が開かなかったときは</button>
       <div id="tkPaste" hidden style="margin-top:12px;">
-        <p class="hint">ドロッパーの「🙋 出欠システムに保存」を押したときにコピーされた内容を、
-           ここに貼り付けてください。</p>
-        <textarea id="tkToken" placeholder="ここに貼り付け" autocomplete="off"></textarea>
-        <button class="btn wide" id="tkImport" type="button">貼り付けて取り込む</button>
+        <p class="hint" data-i18n="adPasteLead"></p>
+        <textarea id="tkToken" data-i18n-ph="adPastePh" placeholder="ここに貼り付け" autocomplete="off"></textarea>
+        <button class="btn wide" id="tkImport" type="button" data-i18n="adPasteGo">貼り付けて取り込む</button>
       </div>
 
       <div id="tkList" style="margin-top:16px;"></div>
@@ -162,66 +167,64 @@
 
       <button class="btn sub wide" id="tkManualBtn" type="button" style="margin-top:8px;">＋ 手で入力して追加</button>
       <div id="tkManual" hidden style="margin-top:12px;">
-        <div class="field"><label for="mkName">行事名</label><input id="mkName" type="text" autocomplete="off"></div>
-        <div class="field"><label for="mkDate">開催日</label><input id="mkDate" type="date"></div>
-        <div class="field"><label for="mkDead">申込締切</label><input id="mkDead" type="date"></div>
-        <div class="field"><label for="mkPlace">会場（回答画面の地図ボタンに使います）</label><input id="mkPlace" type="text" autocomplete="off"></div>
-        <div class="field"><label for="mkItems">種目（読点で区切る。空なら「参加」）</label><input id="mkItems" type="text" autocomplete="off"></div>
+        <div class="field"><label for="mkName" data-i18n="adMkName">行事名</label><input id="mkName" type="text" autocomplete="off"></div>
+        <div class="field"><label for="mkDate" data-i18n="adMkDate">開催日</label><input id="mkDate" type="date"></div>
+        <div class="field"><label for="mkDead" data-i18n="adMkDead">申込締切</label><input id="mkDead" type="date"></div>
+        <div class="field"><label for="mkPlace" data-i18n="adMkPlace">会場（回答画面の地図ボタンに使います）</label><input id="mkPlace" type="text" autocomplete="off"></div>
+        <div class="field"><label for="mkItems" data-i18n="adMkItems">種目（読点で区切る。空なら「参加」）</label><input id="mkItems" type="text" autocomplete="off"></div>
         <p class="msg" id="mkMsg"></p>
-        <button class="btn wide" id="mkGo" type="button">この行事を追加</button>
+        <button class="btn wide" id="mkGo" type="button" data-i18n="adMkGo">この行事を追加</button>
       </div>
     </section>
 
     <!-- 受付中の出欠 -->
     <section class="step">
-      <h2>出欠の集まり具合</h2>
-      <p class="hint">未回答の方のお名前が出るのはこの画面だけです。参加者には人数しか見えません。</p>
+      <h2 data-i18n="adEvTitle">出欠の集まり具合</h2>
+      <p class="hint" data-i18n="adEvHint"></p>
       <div id="evList"></div>
     </section>
 
     <!-- 自分用の管理リンク。ふだんは伏せておく（肩ごしに見られる場所で開くこともある） -->
     <section class="step">
-      <h2>あなたの管理リンク</h2>
-      <p class="hint">この画面をもう一度開くためのリンクです。<b>人に渡さないでください。</b>
-         渡すと名簿も回答も操作されます。</p>
+      <h2 data-i18n="adMyTitle">あなたの管理リンク</h2>
+      <p class="hint" id="myHint"></p>
       <button class="btn sub wide" id="myShow" type="button">管理リンクを表示する</button>
       <div id="myBox" hidden style="margin-top:12px;">
         <div class="urlbox">
-          <div class="t">あなただけのもの</div>
-          <div class="u"><input id="myUrl" type="text" readonly><button class="btn" data-copy="myUrl" type="button">コピー</button></div>
+          <div class="t" data-i18n="adMyBoxT">あなただけのもの</div>
+          <div class="u"><input id="myUrl" type="text" readonly><button class="btn" data-copy="myUrl" type="button" data-i18n="adCopy">コピー</button></div>
         </div>
-        <p class="hint">機種を替えたときや、ホーム画面のアプリで使うときは、これをコピーして
-           「すでに団体をお持ちの方」に貼り付けてください。</p>
+        <p class="hint" data-i18n="adMyNote"></p>
       </div>
     </section>
 
     <!-- 配るURL -->
     <section class="step">
-      <h2>みなさんに配るURL</h2>
+      <h2 data-i18n="adUrlTitle">みなさんに配るURL</h2>
       <div class="urlbox">
-        <div class="t">① 出欠を入力する</div>
-        <div class="u"><input id="u1" type="text" readonly><button class="btn" data-copy="u1" type="button">コピー</button></div>
+        <div class="t" data-i18n="adUrl1">① 出欠を入力する</div>
+        <div class="u"><input id="u1" type="text" readonly><button class="btn" data-copy="u1" type="button" data-i18n="adCopy">コピー</button></div>
       </div>
       <div class="urlbox">
-        <div class="t">② わたしの回答</div>
-        <div class="u"><input id="u2" type="text" readonly><button class="btn" data-copy="u2" type="button">コピー</button></div>
+        <div class="t" data-i18n="adUrl2">② わたしの回答</div>
+        <div class="u"><input id="u2" type="text" readonly><button class="btn" data-copy="u2" type="button" data-i18n="adCopy">コピー</button></div>
       </div>
       <div class="urlbox">
-        <div class="t">③ 集まり具合</div>
-        <div class="u"><input id="u3" type="text" readonly><button class="btn" data-copy="u3" type="button">コピー</button></div>
+        <div class="t" data-i18n="adUrl3">③ 集まり具合</div>
+        <div class="u"><input id="u3" type="text" readonly><button class="btn" data-copy="u3" type="button" data-i18n="adCopy">コピー</button></div>
       </div>
-      <p class="hint">この3本はずっと変わりません。LINEのリッチメニューに一度貼れば、行事が増えても貼り直しは要りません。</p>
+      <p class="hint" data-i18n="adUrlHint"></p>
     </section>
 
     <!-- 団体名と名簿 -->
     <section class="step">
-      <h2>団体名とメンバー</h2>
+      <h2 data-i18n="adEditTitle">団体名とメンバー</h2>
       <div class="field">
-        <label for="edOrg">団体名</label>
+        <label for="edOrg" data-i18n="adOrgName">団体名</label>
         <input id="edOrg" type="text" autocomplete="off">
       </div>
       <div class="field">
-        <label for="edLang">参加者に見せることば</label>
+        <label for="edLang" data-i18n="adOrgLang">参加者に見せることば</label>
         <select id="edLang">
           <option value="ja">日本語</option>
           <option value="en">English</option>
@@ -229,36 +232,69 @@
         </select>
       </div>
       <div class="field">
-        <label>メンバー（備考に「退会」と書くと名簿から外れます）</label>
+        <label data-i18n="adMembersEdit">メンバー（備考に「退会」と書くと名簿から外れます）</label>
         <div id="edRows"></div>
-        <button class="btn sub" id="edAdd" type="button">＋ 1人ふやす</button>
+        <button class="btn sub" id="edAdd" type="button" data-i18n="adAddOne">＋ 1人ふやす</button>
       </div>
       <p class="msg" id="edMsg"></p>
-      <button class="btn wide" id="edSave" type="button">保存する</button>
+      <button class="btn wide" id="edSave" type="button" data-i18n="adSave">保存する</button>
     </section>
 
     <!-- 削除 -->
     <section class="step danger">
-      <h2>この団体を削除する</h2>
-      <p>名簿・行事・出欠・回答が<b>すべて消えます。元に戻せません。</b></p>
+      <h2 data-i18n="adDelTitle">この団体を削除する</h2>
+      <p id="delLead"></p>
       <div class="field">
-        <label for="delName">確認のため、団体名をそのまま入力してください</label>
+        <label for="delName" data-i18n="adDelLabel">確認のため、団体名をそのまま入力してください</label>
         <input id="delName" type="text" autocomplete="off">
       </div>
       <p class="msg" id="delMsg"></p>
-      <button class="btn warn wide" id="delGo" type="button">削除する</button>
+      <button class="btn warn wide" id="delGo" type="button" data-i18n="adDelGo">削除する</button>
     </section>
 
   </div>
 </div>
 
 <script src="attend.js?v=20260824"></script>
+<script src="admin-i18n.js?v=20260824"></script>
 <script>
 (function () {
   'use strict';
 
   var esc = ATTEND.esc;
+  var T = ATTEND.t;
   var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- 画面のことば ----------
+     ★ 参加者に見せることば（団体の設定）とは**別物**。
+     日本語の主催者が英語の団体を運営することがあるので、団体の設定には従わない。
+     既定はブラウザのことば。選んだら端末に覚える。 */
+  var UI_LANG_KEY = 'attend.adminLang';
+  ATTEND.followOrgLang(false);
+
+  (function () {
+    var saved = ATTEND.lsGet(UI_LANG_KEY);
+    var use = ATTEND.setUiLang(saved || ATTEND.browserLang());
+    var sel = document.getElementById('uiLang');
+    sel.value = use;
+    sel.addEventListener('change', function () {
+      ATTEND.lsSet(UI_LANG_KEY, ATTEND.setUiLang(sel.value));
+      repaint();
+    });
+    repaint();   // 起動時にも通す。**忘れると、組み立てで作る文言が空のままになる**
+  })();
+
+  /** ことばを変えたときに、その場で作り直す部分 */
+  function repaint() {
+    $('keyWarn').innerHTML = '<b>' + esc(T('adKeyWarn1')) + '</b><br>'
+      + esc(T('adKeyWarn2')) + '<b>' + esc(T('adKeyWarn3')) + '</b><br>' + esc(T('adKeyWarn4'));
+    $('myHint').innerHTML = T('adMyHint');
+    $('delLead').innerHTML = T('adDelLead');
+    $('myShow').textContent = T($('myBox').hidden ? 'adMyShow' : 'adMyHide');
+    $('tkPasteBtn').textContent = T($('tkPaste').hidden ? 'adPasteOpen' : 'adPasteClose');
+    $('tkManualBtn').textContent = T($('tkManual').hidden ? 'adManualOpen' : 'adManualClose');
+    if (!$('home').hidden) { paintConn(); loadTaikai(); loadEvents(); }
+  }
   var show = function (el, on) { el.hidden = !on; };
   var say = function (el, text, cls) { el.textContent = text; el.className = 'msg' + (cls ? ' ' + cls : ''); };
 
@@ -338,26 +374,31 @@
       body: JSON.stringify(body)
     }).then(function (r) { return r.text(); }).then(function (t) {
       var d;
-      try { d = JSON.parse(t); } catch (e) { throw new Error('出欠システムに接続できませんでした。'); }
+      try { d = JSON.parse(t); } catch (e) { throw new Error(T('adErrConn')); }
       if (!d || d.ok !== true) {
-        var err = new Error((d && d.error) || 'エラーが起きました。');
+        var err = new Error((d && d.error) || T('adErrGeneric'));
         err.needKey = !!(d && d.needKey);   // 合鍵そのものが通らなかったのか、を呼び手で見分ける
         throw err;
       }
       return d;
     });
   }
-  function withKey(body) { body.adminKey = adminKey; return api(body); }
+  /* 主催者の画面の日付を、主催者自身のことばで書いてもらうために、毎回 uiLang を送る。
+     **団体の設定（参加者に見せることば）とは別物。** */
+  function withKey(body) { body.adminKey = adminKey; body.uiLang = ATTEND.lang(); return api(body); }
 
   /* ---------- 名簿の入力欄 ---------- */
   function memberRow(box, m) {
     var row = document.createElement('div');
     row.className = 'mrow';
     row.innerHTML =
-      '<input class="mname" type="text" placeholder="お名前" autocomplete="off">' +
-      '<select class="mgender"><option value="">性別</option><option value="男">男</option><option value="女">女</option></select>' +
-      '<input class="mnote" type="text" placeholder="備考" autocomplete="off" style="max-width:88px;">' +
-      '<button class="del" type="button" aria-label="この行を消す">×</button>';
+      // 男女の値（男 / 女）は保存される値なので訳さない。見た目のラベルだけ訳す
+      '<input class="mname" type="text" placeholder="' + esc(T('adPhName')) + '" autocomplete="off">' +
+      '<select class="mgender"><option value="">' + esc(T('adPhGender')) + '</option>' +
+      '<option value="男">' + esc(T('adGenderM')) + '</option>' +
+      '<option value="女">' + esc(T('adGenderF')) + '</option></select>' +
+      '<input class="mnote" type="text" placeholder="' + esc(T('adPhNote')) + '" autocomplete="off" style="max-width:88px;">' +
+      '<button class="del" type="button" aria-label="' + esc(T('adDelRow')) + '">×</button>';
     row.querySelector('.mname').value = (m && m.name) || '';
     row.querySelector('.mgender').value = (m && m.gender) || '';
     row.querySelector('.mnote').value = (m && m.note) || '';
@@ -410,14 +451,13 @@
   $('haveGo').addEventListener('click', function () {
     var key = keyFrom($('haveKey').value);
     if (!key) {
-      say($('haveMsg'), '管理リンクが読み取れませんでした。'
-        + 'ブックマークや、ご自分あてに送っておいたメッセージから、リンク全体をコピーして貼り付けてください。', 'ng');
+      say($('haveMsg'), T('adHaveBad'), 'ng');
       return;
     }
     adminKey = key;
     pasteTry = true;
     $('haveKey').value = '';          // 画面に合鍵を残さない
-    say($('haveMsg'), '開いています…');
+    say($('haveMsg'), T('adHaveOpening'));
     showStart(false);
     load();
   });
@@ -430,12 +470,12 @@
 
   $('newGo').addEventListener('click', function () {
     var name = $('newOrg').value.trim();
-    if (!name) { say($('newMsg'), '団体名を入れてください。', 'ng'); $('newOrg').focus(); return; }
+    if (!name) { say($('newMsg'), T('adNeedOrgName'), 'ng'); $('newOrg').focus(); return; }
     var members = readMembers($newRows);
-    if (!members.length) { say($('newMsg'), 'お名前をひとつ以上入れてください。', 'ng'); return; }
+    if (!members.length) { say($('newMsg'), T('adNeedMember'), 'ng'); return; }
 
     this.disabled = true;
-    say($('newMsg'), 'つくっています…');
+    say($('newMsg'), T('adCreating'));
     api({ action: 'createOrg', name: name, lang: $('newLang').value, members: members }).then(function (d) {
       adminKey = d.adminKey;
       $('keyUrl').value = d.urls.admin;
@@ -464,8 +504,8 @@
     var done = false;
     try { done = document.execCommand('copy'); } catch (err) { done = false; }
     if (navigator.clipboard) navigator.clipboard.writeText(input.value).catch(function () {});
-    b.textContent = done || navigator.clipboard ? 'コピー済' : '長押しでコピー';
-    setTimeout(function () { b.textContent = 'コピー'; }, 1600);
+    b.textContent = T(done || navigator.clipboard ? 'adCopied' : 'adCopyLong');
+    setTimeout(function () { b.textContent = T('adCopy'); }, 1600);
   });
 
   /* ---------- ふだんの画面 ---------- */
@@ -515,30 +555,31 @@
       tkRows = d.taikai || [];
       var box = $('tkList');
       if (!d.taikai.length) {
-        box.innerHTML = '<p class="hint">まだ行事がありません。上に貼り付けるか、下のボタンから手で入力してください。</p>';
+        box.innerHTML = '<p class="hint">' + esc(T('adTkNone')) + '</p>';
         show($('tkMore'), false);
         return;
       }
       box.innerHTML = d.taikai.map(function (t) {
         var meta = [];
-        if (t.dateText) meta.push('開催 ' + t.dateText);
-        if (t.deadlineText) meta.push('締切 ' + t.deadlineText);
-        if (t.items.length) meta.push(t.items.join('、'));
+        if (t.dateText) meta.push(T('adTkDate') + t.dateText);
+        if (t.deadlineText) meta.push(T('adTkDead') + t.deadlineText);
+        if (t.items.length) meta.push(t.items.join(T('adJoin')));
         return '<div class="tkcard"><div class="n">' + esc(t.name) + '</div>'
-          + (meta.length ? '<div class="m">' + esc(meta.join('　/　')) + '</div>' : '')
-          + '<div>' + (t.eventId ? '<span class="b yes">✓ 出欠あり</span>' : '<span class="b no">未使用</span>') + '</div>'
+          + (meta.length ? '<div class="m">' + esc(meta.join(T('adSep'))) + '</div>' : '')
+          + '<div>' + (t.eventId ? '<span class="b yes">' + esc(T('adTkUsed')) + '</span>'
+                                    : '<span class="b no">' + esc(T('adTkUnused')) + '</span>') + '</div>'
           + (t.eventId
               // 出欠を作ってある行事は消せない。**理由を書かないと押せない訳が分からない**
-              ? '<p class="pend">出欠を作ってあるので、この行事は消せません。'
-                + '消したいときは、下の「出欠の集まり具合」でこの出欠を先に消してください。</p>'
-              : '<button class="btn wide" style="margin-top:10px;" data-mk="' + esc(t.id) + '" type="button">この行事で出欠を作る</button>'
+              ? '<p class="pend">' + esc(T('adTkLocked')) + '</p>'
+              : '<button class="btn wide" style="margin-top:10px;" data-mk="' + esc(t.id) + '" type="button">'
+                + esc(T('adTkMake')) + '</button>'
                 + '<button class="btn sub wide" style="margin-top:8px;" data-tkdel="' + esc(t.id) + '" data-name="'
-                + esc(t.name) + '" type="button">この行事を消す</button>')
+                + esc(t.name) + '" type="button">' + esc(T('adTkDel')) + '</button>')
           + '</div>';
       }).join('');
 
       if (d.total > d.taikai.length) {
-        $('tkMore').textContent = '新しい' + d.taikai.length + '件を出しています（全' + d.total + '件）。';
+        $('tkMore').textContent = T('adTkMore', { n: d.taikai.length, total: d.total });
         show($('tkMore'), true);
       } else { show($('tkMore'), false); }
     }).then(function () { if (done) done(); })
@@ -554,21 +595,21 @@
     if (!t) { show($('tkIn'), false); return; }
 
     var meta = [];
-    if (t.dateText) meta.push('開催 ' + t.dateText);
-    if (t.deadlineText) meta.push('締切 ' + t.deadlineText);
-    if (t.items.length) meta.push(t.items.join('、'));
+    if (t.dateText) meta.push(T('adTkDate') + t.dateText);
+    if (t.deadlineText) meta.push(T('adTkDead') + t.deadlineText);
+    if (t.items.length) meta.push(t.items.join(T('adJoin')));
 
     $('tkInName').textContent = t.name;
-    $('tkInMeta').textContent = meta.join('　/　');
+    $('tkInMeta').textContent = meta.join(T('adSep'));
     $('tkInGo').setAttribute('data-mk', t.id);
     $('tkInGo').disabled = false;
-    $('tkInGo').textContent = 'この内容で出欠を受け付ける';
+    $('tkInGo').textContent = T('adTkAccept');
 
     if (t.eventId) {
-      say($('tkInMsg'), 'この行事は、すでに出欠を受け付けています。', 'ok');
+      say($('tkInMsg'), T('adTkAlready'), 'ok');
       show($('tkInGo'), false);
     } else {
-      say($('tkInMsg'), '取り込みました。この内容でよければ、出欠の受付を始められます。', 'ok');
+      say($('tkInMsg'), T('adTkImported'), 'ok');
       show($('tkInGo'), true);
     }
     show($('tkIn'), true);
@@ -577,9 +618,9 @@
   function receive(token) {
     show($('tkIn'), true);
     show($('tkInGo'), false);
-    $('tkInName').textContent = 'イベントドロッパーから届きました';
+    $('tkInName').textContent = T('adTkFrom');
     $('tkInMeta').textContent = '';
-    say($('tkInMsg'), '取り込んでいます…');
+    say($('tkInMsg'), T('adTkImporting'));
 
     withKey({ action: 'importTaikai', token: token }).then(function (d) {
       loadTaikai(function () { showIncoming(d.taikaiId); });
@@ -607,7 +648,7 @@
   $('tkInGo').addEventListener('click', function () {
     var b = this;
     b.disabled = true;
-    b.textContent = '始めています…';
+    b.textContent = T('adTkAccepting');
     withKey({ action: 'createEventFromTaikai', taikaiId: b.getAttribute('data-mk') })
       .then(function () {
         var row = null;
@@ -622,15 +663,15 @@
 
         // ドロッパーから来たのなら、案内文づくりに戻ってもらう。順番はここで決まる
         if (backWay) {
-          say($('tkInMsg'), '出欠の受付を始めました。イベントドロッパーに戻ります…', 'ok');
+          say($('tkInMsg'), T('adTkStartedBack'), 'ok');
           setTimeout(goBack, 1400);
         } else {
-          say($('tkInMsg'), '出欠の受付を始めました。参加者の一覧に出ています。', 'ok');
+          say($('tkInMsg'), T('adTkStarted'), 'ok');
         }
       })
       .catch(function (err) {
         b.disabled = false;
-        b.textContent = 'この内容で出欠を受け付ける';
+        b.textContent = T('adTkAccept');
         say($('tkInMsg'), err.message, 'ng');
       });
   });
@@ -640,19 +681,15 @@
      覚えないと、届いた行事は預かるが、毎回ご自分の管理リンクを開き直すことになる。 */
   function paintConn() {
     var on = pick(REM) && pick(REM) === adminKey;
-    $('connNote').innerHTML = on
-      ? 'この端末は<b>この団体の管理リンクを覚えています</b>。イベントドロッパーの「🙋 出欠システムに保存」から、そのままここに取り込めます。'
-        + '<br>共用の端末では消してください。<b>覚えていても、管理リンクの控えは必ず別に残しておいてください。</b>'
-      : 'イベントドロッパーの「🙋 出欠システムに保存」から直に取り込めるようにするには、この端末に管理リンクを覚えさせてください。'
-        + '<br><b>この端末を使える人は、あなたと同じ操作ができるようになります。</b>共用の端末では覚えさせないでください。'
-        + (pasteTry ? '<br>いまは貼り付けて開いています。<b>覚えさせておくと、次からは貼り付けが要りません。</b>' : '');
-    $('connGo').textContent = on ? 'この端末から消す' : 'この端末に覚える';
+    $('connNote').innerHTML = on ? T('adConnOn')
+      : (T('adConnOff') + (pasteTry ? T('adConnPaste') : ''));
+    $('connGo').textContent = T(on ? 'adConnForget' : 'adConnRemember');
   }
 
   $('myShow').addEventListener('click', function () {
     var on = $('myBox').hidden;
     show($('myBox'), on);
-    this.textContent = on ? '管理リンクを隠す' : '管理リンクを表示する';
+    this.textContent = T(on ? 'adMyHide' : 'adMyShow');
   });
 
   $('connGo').addEventListener('click', function () {
@@ -663,7 +700,7 @@
       return;
     }
     if (!store(REM, adminKey)) {
-      say($('tkMsg'), 'この端末は記憶を受け付けませんでした（プライベートブラウズなど）。貼り付けでお使いください。', 'ng');
+      say($('tkMsg'), T('adConnNoStore'), 'ng');
       return;
     }
     paintConn();
@@ -671,12 +708,12 @@
 
   $('tkImport').addEventListener('click', function () {
     var token = $('tkToken').value.trim();
-    if (!token) { say($('tkMsg'), '貼り付ける内容がありません。', 'ng'); return; }
+    if (!token) { say($('tkMsg'), T('adPasteEmpty'), 'ng'); return; }
     this.disabled = true;
-    say($('tkMsg'), '取り込んでいます…');
+    say($('tkMsg'), T('adTkImporting'));
     withKey({ action: 'importTaikai', token: token }).then(function (d) {
       $('tkToken').value = '';
-      say($('tkMsg'), d.existing ? '「' + d.name + '」はすでに取り込みずみです。' : '「' + d.name + '」を取り込みました。', 'ok');
+      say($('tkMsg'), T(d.existing ? 'adTkExistsMsg' : 'adTkImportedMsg', { name: d.name }), 'ok');
       $('tkImport').disabled = false;
       loadTaikai();
     }).catch(function (e) {
@@ -688,19 +725,19 @@
   $('tkPasteBtn').addEventListener('click', function () {
     var on = $('tkPaste').hidden;
     show($('tkPaste'), on);
-    this.textContent = on ? '貼り付けをとじる' : 'この画面が開かなかったときは';
+    this.textContent = T(on ? 'adPasteClose' : 'adPasteOpen');
     if (on) $('tkToken').focus();
   });
 
   $('tkManualBtn').addEventListener('click', function () {
     var on = $('tkManual').hidden;
     show($('tkManual'), on);
-    this.textContent = on ? '手入力をとじる' : '＋ 手で入力して追加';
+    this.textContent = T(on ? 'adManualClose' : 'adManualOpen');
   });
 
   $('mkGo').addEventListener('click', function () {
     var name = $('mkName').value.trim();
-    if (!name) { say($('mkMsg'), '行事名を入れてください。', 'ng'); return; }
+    if (!name) { say($('mkMsg'), T('adMkNeedName'), 'ng'); return; }
     this.disabled = true;
     withKey({
       action: 'addTaikaiManually', name: name,
@@ -709,7 +746,7 @@
     }).then(function (d) {
       $('mkName').value = ''; $('mkDate').value = ''; $('mkDead').value = '';
       $('mkPlace').value = ''; $('mkItems').value = '';
-      say($('mkMsg'), d.existing ? 'すでに同じ行事があります。' : '追加しました。', 'ok');
+      say($('mkMsg'), T(d.existing ? 'adMkExists' : 'adMkAdded'), 'ok');
       $('mkGo').disabled = false;
       loadTaikai();
     }).catch(function (e) { $('mkGo').disabled = false; say($('mkMsg'), e.message, 'ng'); });
@@ -719,10 +756,10 @@
   $('tkList').addEventListener('click', function (e) {
     var d = e.target.closest('[data-tkdel]');
     if (d) {
-      if (!window.confirm('「' + d.getAttribute('data-name') + '」を消します。よろしいですか。')) return;
+      if (!window.confirm(T('adTkDelAsk', { name: d.getAttribute('data-name') }))) return;
       d.disabled = true;
       withKey({ action: 'deleteTaikai', taikaiId: d.getAttribute('data-tkdel') })
-        .then(function () { say($('tkMsg'), '消しました。', 'ok'); loadTaikai(); })
+        .then(function () { say($('tkMsg'), T('adTkDeleted'), 'ok'); loadTaikai(); })
         .catch(function (err) { d.disabled = false; say($('tkMsg'), err.message, 'ng'); });
       return;
     }
@@ -730,12 +767,12 @@
     var b = e.target.closest('[data-mk]');
     if (!b) return;
     b.disabled = true;
-    b.textContent = '作っています…';
+    b.textContent = T('adTkMaking');
     withKey({ action: 'createEventFromTaikai', taikaiId: b.getAttribute('data-mk') })
       .then(function () { loadTaikai(); loadEvents(); })
       .catch(function (err) {
         b.disabled = false;
-        b.textContent = 'この行事で出欠を作る';
+        b.textContent = T('adTkMake');
         say($('tkMsg'), err.message, 'ng');
       });
   });
@@ -745,35 +782,34 @@
     withKey({ action: 'adminEvents' }).then(function (d) {
       var box = $('evList');
       if (!d.events.length) {
-        box.innerHTML = '<p class="hint">まだ出欠がありません。上の行事から作ってください。</p>';
+        box.innerHTML = '<p class="hint">' + esc(T('adEvNone')) + '</p>';
         return;
       }
       box.innerHTML = d.events.map(function (ev) {
         var meta = [];
-        if (ev.date) meta.push('開催 ' + ev.date);
-        if (ev.deadline) meta.push('締切 ' + ev.deadline);
+        if (ev.date) meta.push(T('adTkDate') + ev.date);
+        if (ev.deadline) meta.push(T('adTkDead') + ev.deadline);
         // 「手で締めた」と「締切日をすぎた」は分けて出す。
         // 同じ「締切ずみ」に見えると、再開できるのかどうか分からない
-        var state = ev.manualClosed ? '<span class="b no">手じまい中</span>'
-                  : ev.datePassed   ? '<span class="b no">締切日をすぎました</span>'
-                                    : '<span class="b yes">受付中</span>';
+        var state = '<span class="b ' + (ev.manualClosed || ev.datePassed ? 'no' : 'yes') + '">'
+          + esc(T(ev.manualClosed ? 'adEvManual' : ev.datePassed ? 'adEvPassed' : 'adEvOpen')) + '</span>';
         return '<div class="tkcard"><div class="n">' + esc(ev.name) + '</div>'
-          + (meta.length ? '<div class="m">' + esc(meta.join('　/　')) + '</div>' : '')
+          + (meta.length ? '<div class="m">' + esc(meta.join(T('adSep'))) + '</div>' : '')
           + '<div>' + state
-          + '　<span class="b no">回答 ' + Number(ev.respCount || 0) + '人</span></div>'
+          + ' <span class="b no">' + esc(T('adEvResp', { n: Number(ev.respCount || 0) })) + '</span></div>'
           + ATTEND.summaryHtml(ev)
           + (ev.pending && ev.pending.length
-              ? '<p class="pend">まだ答えていない方（' + ev.pending.length + '人）：' + esc(ev.pending.join('、')) + '</p>'
-              : '<p class="pend">全員が答えました。</p>')
+              ? '<p class="pend">' + esc(T('adEvPending', { n: ev.pending.length, names: ev.pending.join(T('adJoin')) })) + '</p>'
+              : '<p class="pend">' + esc(T('adEvAllIn')) + '</p>')
           // 締切日をすぎたぶんは再開しても受け付けられない（日付で閉じるため）。
           // 押せるように見せると混乱するので、その場合はボタンを出さない
           + (ev.datePassed && !ev.manualClosed
               ? ''
               : '<button class="btn sub wide" style="margin-top:10px;" data-close="' + esc(ev.id) + '" data-now="'
                 + (ev.manualClosed ? '1' : '0') + '" type="button">'
-                + (ev.manualClosed ? '受付を再開する' : '受付を締め切る') + '</button>')
+                + esc(T(ev.manualClosed ? 'adEvReopen' : 'adEvClose')) + '</button>')
           + '<button class="btn sub wide del-ev" style="margin-top:8px;" data-evdel="' + esc(ev.id) + '" data-name="'
-          + esc(ev.name) + '" data-n="' + Number(ev.respCount || 0) + '" type="button">この出欠を消す</button>'
+          + esc(ev.name) + '" data-n="' + Number(ev.respCount || 0) + '" type="button">' + esc(T('adEvDel')) + '</button>'
           + '</div>';
       }).join('');
     }).catch(function () { /* 画面上部で伝えるので、ここでは黙る */ });
@@ -784,9 +820,9 @@
     if (d) {
       var n = Number(d.getAttribute('data-n') || 0);
       // 何人ぶんの回答が消えるかを先に言う。あとから「消えると思わなかった」を防ぐため
-      var msg = '「' + d.getAttribute('data-name') + '」の出欠を消します。\n'
-        + (n ? 'すでに集まった' + n + '人ぶんの回答も一緒に消えます。\n' : '')
-        + '元に戻せません。よろしいですか。';
+      var msg = T('adEvDelAsk1', { name: d.getAttribute('data-name') }) + '\n'
+        + (n ? T('adEvDelAsk2', { n: n }) + '\n' : '')
+        + T('adEvDelAsk3');
       if (!window.confirm(msg)) return;
       d.disabled = true;
       withKey({ action: 'deleteEvent', eventId: d.getAttribute('data-evdel') })
@@ -807,17 +843,17 @@
   $('edSave').addEventListener('click', function () {
     var name = $('edOrg').value.trim();
     var members = readMembers($edRows);
-    if (!name) { say($('edMsg'), '団体名を入れてください。', 'ng'); return; }
-    if (!members.length) { say($('edMsg'), 'お名前をひとつ以上入れてください。', 'ng'); return; }
+    if (!name) { say($('edMsg'), T('adNeedOrgName'), 'ng'); return; }
+    if (!members.length) { say($('edMsg'), T('adNeedMember'), 'ng'); return; }
 
     this.disabled = true;
-    say($('edMsg'), '保存しています…');
+    say($('edMsg'), T('adSaving'));
     withKey({ action: 'saveOrg', name: name, lang: $('edLang').value })
       .then(function () { return withKey({ action: 'saveMembers', members: members }); })
       .then(function () {
         $('edSave').disabled = false;
         $('org').textContent = name;
-        say($('edMsg'), '保存しました。', 'ok');
+        say($('edMsg'), T('adSaved'), 'ok');
         loadEvents();   // 未回答者の顔ぶれが変わる
       })
       .catch(function (e) { $('edSave').disabled = false; say($('edMsg'), e.message, 'ng'); });
@@ -826,16 +862,15 @@
   /* 削除 */
   $('delGo').addEventListener('click', function () {
     var name = $('delName').value.trim();
-    if (!name) { say($('delMsg'), '団体名を入力してください。', 'ng'); return; }
-    if (!window.confirm('本当に削除しますか。元に戻せません。')) return;
+    if (!name) { say($('delMsg'), T('adDelNeedName'), 'ng'); return; }
+    if (!window.confirm(T('adDelAsk'))) return;
 
     this.disabled = true;
     withKey({ action: 'deleteOrg', confirm: name }).then(function () {
       if (pick(REM) === adminKey) store(REM, null);   // 消えた団体の合鍵を端末に残さない
       document.body.innerHTML =
-        '<header><h1>削除しました</h1></header>'
-        + '<div class="wiz"><section class="step"><p>この団体のデータはすべて消えました。'
-        + '配っていたURLも開けなくなります。</p></section></div>';
+        '<header><h1>' + esc(T('adDelDoneT')) + '</h1></header>'
+        + '<div class="wiz"><section class="step"><p>' + esc(T('adDelDoneB')) + '</p></section></div>';
     }).catch(function (e) { $('delGo').disabled = false; say($('delMsg'), e.message, 'ng'); });
   });
 
@@ -867,7 +902,7 @@
     window.close();
     // 閉じさせてもらえない端末がある。そのときのために、行き先を伝えておく
     setTimeout(function () {
-      $('backMsg').textContent = 'もとの画面に戻りました。このタブは閉じてかまいません。';
+      $('backMsg').textContent = T('adBackDone');
     }, 400);
   }
 
@@ -885,9 +920,7 @@
     // 合鍵が無いのに行事が届いた。捨てずに預かって、管理リンクで開き直してもらう
     if (inToken) {
       keepPending(inToken);
-      say($('haveMsg'),
-        'イベントドロッパーから行事を受け取りました。取り込む先が分からないので、'
-        + '上の欄に管理リンクを貼り付けてください。1時間だけお預かりします。', 'ok');
+      say($('haveMsg'), T('adPending'), 'ok');
     }
   }
 })();

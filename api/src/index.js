@@ -349,7 +349,9 @@ async function listTaikai(env, b) {
   const org = await authOrg(env, b);
   if (!org.ok) return org;
 
-  const all = await taikaiOf(env, org.row.id);
+  /* 主催者の画面の日付は、**主催者自身が選んだことば**で書く（団体の設定ではない）。
+     サーバーは主催者のことばを知らないので、画面から uiLang をもらう。 */
+  const all = await taikaiOf(env, org.row.id, b.uiLang);
   return { ok: true, total: all.length, taikai: all.slice(0, TAIKAI_LIST_MAX) };
 }
 
@@ -453,7 +455,7 @@ async function adminEvents(env, b) {
   const roster = await membersOf(env, org.row.id, false);
   const list = [];
 
-  for (const ev of (await eventsOf(env, org.row.id)).reverse()) {
+  for (const ev of (await eventsOf(env, org.row.id, b.uiLang)).reverse()) {
     const byName = await latestOfEvent(env, org.row.id, ev.id);
     list.push(Object.assign(summaryOf(ev, byName, genders), {
       manualClosed: ev.manualClosed,
