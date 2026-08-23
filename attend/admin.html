@@ -55,9 +55,26 @@
 
 <div class="wiz">
 
-  <!-- 合鍵つきのリンクで来ていないとき。ここから団体をつくる -->
+  <!-- 合鍵つきのリンクで来ていないとき。まず「すでにお持ちの方」を見せる。
+       ここを飛ばして下でつくられると、団体が二重になって配ったURLが古いほうを指したままになる -->
+  <section class="step" id="haveScreen" hidden>
+    <h2>すでに団体をお持ちの方</h2>
+    <p class="hint">管理リンクを貼り付けると、この画面のまま開けます。
+       ホーム画面に登録したアプリからは、LINEやメールのリンクを押しても
+       <b>別のブラウザで開いてしまう</b>ので、こちらからどうぞ。</p>
+    <div class="field">
+      <label for="haveKey">管理リンク</label>
+      <input id="haveKey" type="text" inputmode="url" autocomplete="off"
+             placeholder="https://app.dropper-tools.com/attend/admin.html?s=…#k=…">
+    </div>
+    <p class="msg" id="haveMsg"></p>
+    <button class="btn wide" id="haveGo" type="button">この管理リンクで開く</button>
+  </section>
+
   <section class="step" id="newScreen" hidden>
     <h2><span class="num">1</span>団体をつくる</h2>
+    <p class="hint"><b>すでに団体をお持ちの方は、ここでつくらないでください。</b>
+       別の団体になり、配ったURLは古いほうを指したままになります。上の欄をお使いください。</p>
 
     <div class="field">
       <label for="newOrg">団体名</label>
@@ -326,6 +343,44 @@
     }).filter(function (m) { return !!m.name; });
   }
 
+  /* ---------- 合鍵を持っていない画面 ----------
+     「すでにお持ちの方」と「団体をつくる」は、いつも一緒に出し入れする。
+     つくるほうだけ見せると、持っている人が二つめの団体をつくってしまう。 */
+  function showStart(on) {
+    show($('haveScreen'), on);
+    show($('newScreen'), on);
+  }
+
+  /* ---------- 管理リンクを貼り付けて開く ----------
+     ホーム画面に登録したアプリにはアドレス欄が無く、LINEやメールのリンクを押すと
+     別のブラウザ（＝別の入れもの）で開いてしまう。持ち込む道がここしかない。 */
+  var pasteTry = false;
+
+  function keyFrom(text) {
+    var s = String(text == null ? '' : text).trim();
+    if (!s) return '';
+    var m = s.match(/[#&?]k=([^&\s#]+)/);
+    if (m) return decodeURIComponent(m[1]);
+    // 合鍵だけを貼られることもある（32バイトを base64url にした長さ）
+    if (/^[A-Za-z0-9_-]{20,}$/.test(s)) return s;
+    return '';
+  }
+
+  $('haveGo').addEventListener('click', function () {
+    var key = keyFrom($('haveKey').value);
+    if (!key) {
+      say($('haveMsg'), '管理リンクが読み取れませんでした。'
+        + 'ブックマークや、ご自分あてに送っておいたメッセージから、リンク全体をコピーして貼り付けてください。', 'ng');
+      return;
+    }
+    adminKey = key;
+    pasteTry = true;
+    $('haveKey').value = '';          // 画面に合鍵を残さない
+    say($('haveMsg'), '開いています…');
+    showStart(false);
+    load();
+  });
+
   /* ---------- 団体をつくる ---------- */
   var $newRows = $('newRows');
   $('newAdd').setAttribute('data-add', '1');
@@ -343,7 +398,7 @@
     api({ action: 'createOrg', name: name, members: members }).then(function (d) {
       adminKey = d.adminKey;
       $('keyUrl').value = d.urls.admin;
-      show($('newScreen'), false);
+      showStart(false);
       show($('keyScreen'), true);
       window.scrollTo(0, 0);
     }).catch(function (e) {
@@ -390,6 +445,7 @@
       if (!d.members.length) memberRow($edRows, null);
 
       show($('home'), true);
+      say($('haveMsg'), '');
       paintConn();
       loadTaikai();
       loadEvents();
@@ -401,8 +457,10 @@
       // 覚えていた合鍵が通らなくなっていたら（団体を消したなど）、記憶のほうを捨てる
       if (e.needKey && pick(REM) === adminKey) store(REM, null);
       show($('home'), false);
-      show($('newScreen'), true);
-      if (adminKey) say($('newMsg'), e.message, 'ng');
+      showStart(true);
+      // 貼り付けて開こうとしたのなら、返事はその欄のそばに出す
+      if (pasteTry) { say($('haveMsg'), e.message, 'ng'); pasteTry = false; adminKey = ''; }
+      else if (adminKey) say($('newMsg'), e.message, 'ng');
     });
   }
 
@@ -515,7 +573,8 @@
       ? 'この端末は<b>この団体の管理リンクを覚えています</b>。イベントドロッパーの「🙋 出欠システムに保存」から、そのままここに取り込めます。'
         + '<br>共用の端末では消してください。<b>覚えていても、管理リンクの控えは必ず別に残しておいてください。</b>'
       : 'イベントドロッパーの「🙋 出欠システムに保存」から直に取り込めるようにするには、この端末に管理リンクを覚えさせてください。'
-        + '<br><b>この端末を使える人は、あなたと同じ操作ができるようになります。</b>共用の端末では覚えさせないでください。';
+        + '<br><b>この端末を使える人は、あなたと同じ操作ができるようになります。</b>共用の端末では覚えさせないでください。'
+        + (pasteTry ? '<br>いまは貼り付けて開いています。<b>覚えさせておくと、次からは貼り付けが要りません。</b>' : '');
     $('connGo').textContent = on ? 'この端末から消す' : 'この端末に覚える';
   }
 
@@ -704,17 +763,27 @@
   });
 
   /* ---------- ドロッパーへ帰る ----------
-     この画面はドロッパーが開いた**別のタブ**なので、ブラウザの「戻る」では戻れない。
-     開いた側のタブは案内文もカードも抱えたまま残っているので、**閉じて戻す**のがいちばん近い。
-     自分で開いたタブでないと閉じられないため、opener があるときだけ出す。 */
+     ドロッパーからの来かたが2通りあり、帰り方も2通りになる。
+
+       別のタブで開かれた（ふつうのブラウザ）  → 閉じる。もとのタブがそのまま残っている
+       同じ画面で来た（ホーム画面のアプリ）    → 前の画面へ戻る。タブが1枚しかないため
+
+     ホーム画面のアプリはブラウザとは別の入れものなので、そこから新しいタブを開くと
+     記憶もログインも無いブラウザ側に飛び出す。だからドロッパー側が同じ画面で来る。 */
   function opener() {
     try { return window.opener && !window.opener.closed ? window.opener : null; }
     catch (e) { return null; }   // 別の出どころから開かれていたら触れない
   }
 
-  if (opener()) show($('backBar'), true);
+  /* 「戻る」を出してよいのは、直前がドロッパーだったときだけ。
+     #t= を持っているかどうかでは判断しない（リンクを手で開いた場合、戻り先が別物になる）。 */
+  var fromDropper = /^https?:\/\/[^/]+\/calendar(-[a-z]+)?\//.test(document.referrer || '');
+  var backWay = opener() ? 'close' : (fromDropper && history.length > 1 ? 'back' : '');
+  if (backWay) show($('backBar'), true);
 
   $('backGo').addEventListener('click', function () {
+    if (backWay === 'back') { history.back(); return; }
+
     var o = opener();
     if (o) { try { o.focus(); } catch (e) { /* noop */ } }
     window.close();
@@ -732,13 +801,13 @@
   if (adminKey) {
     load();
   } else {
-    show($('newScreen'), true);
+    showStart(true);
     // 合鍵が無いのに行事が届いた。捨てずに預かって、管理リンクで開き直してもらう
     if (inToken) {
       keepPending(inToken);
-      say($('newMsg'),
+      say($('haveMsg'),
         'イベントドロッパーから行事を受け取りました。取り込む先が分からないので、'
-        + 'ご自分の管理リンク（ブックマークに入れたもの）を開いてください。1時間だけお預かりします。', 'ok');
+        + '上の欄に管理リンクを貼り付けてください。1時間だけお預かりします。', 'ok');
     }
   }
 })();
