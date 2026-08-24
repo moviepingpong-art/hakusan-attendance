@@ -69,7 +69,7 @@ var ATTEND = (function () {
       errBadLink: 'リンクが正しくありません。',
       errServer: 'サーバーでエラーが起きました。',
       needLinkTitle: 'リンクが正しくありません',
-      needLinkBody: '主催者から届いた「出欠を回答する」のリンクをそのまま開いてください。アドレスの途中を消すと開けません。',
+      needLinkBody: '主催者から届いた「出欠入力」のリンクをそのまま開いてください。アドレスの途中を消すと開けません。',
       metaDate: '📅 開催：', metaDeadline: '⏰ 締切：', metaPlace: '📍 会場：',
       dueToday: '（本日まで）', dueDays: '（あと{n}日）',
       linkYoukou: '📄 要項を見る', linkMap: '🗺️ 地図で見る', linkCal: '📆 カレンダーに追加',
@@ -81,7 +81,7 @@ var ATTEND = (function () {
       failTitle: '読み込めませんでした', retry: 'もう一度読み込む',
 
       /* 回答ページ */
-      answerTitle: '出欠を回答する', answerHead: '出欠の回答',
+      answerTitle: '出欠入力', answerHead: '出欠入力',
       loadingRoster: '名簿を読み込んでいます…',
       emptyRosterTitle: '名簿がまだ空です',
       emptyRosterBody: '主催者が名簿にお名前を入れると、ここから選べるようになります。',
@@ -106,21 +106,21 @@ var ATTEND = (function () {
       myTitle: 'わたしの回答', legendNone: 'まだ答えていない', refresh: '最新に更新',
       notRegMe: 'この端末はまだ名前の登録がありません',
       notRegTitle: 'まだ登録されていません',
-      notRegBody: '「出欠を回答する」ページを開いて、名簿からお名前を選んでください。登録は最初の1回だけです。',
-      goForm: '出欠を回答するページへ',
+      notRegBody: '「出欠入力」を開いて、名簿からお名前を選んでください。登録は最初の1回だけです。',
+      goForm: '出欠入力へ',
       meMy: '{name} さんの回答です',
       noOpenTitle: 'いま締切前のイベントはありません',
       unansweredSub: 'このイベントにはまだ回答していません',
       editAnswer: '回答を変更する',
 
       /* 集まり具合 */
-      statusTitle: '出欠の状況',
+      statusTitle: '出欠確認',
       footStatus: '※ 人数のみ表示しています（どなたが回答したかは表示されません）。締切前は途中経過のため変わります。',
       noDataTitle: '表示できる出欠データがありません',
       noDataBody: 'イベントが登録されると、ここに集計が出ます。',
 
       /* まとめた1本（index.html）のタブ。LINEのリッチメニューの呼び名にそろえてある */
-      tabAnswer: '出欠入力', tabMy: 'わたしの回答', tabStatus: '集まり具合'
+      tabAnswer: '出欠入力', tabMy: 'わたしの回答', tabStatus: '出欠確認'
     },
 
     en: {
@@ -153,7 +153,7 @@ var ATTEND = (function () {
       sumNamesNote: 'Counts only — who answered is never shown.',
       failTitle: 'Could not load', retry: 'Try again',
 
-      answerTitle: 'Answer attendance', answerHead: 'Attendance',
+      answerTitle: 'Answer', answerHead: 'Answer',
       loadingRoster: 'Loading the roster…',
       emptyRosterTitle: 'The roster is still empty',
       emptyRosterBody: 'Once your organiser adds names to the roster, you can pick yours here.',
@@ -177,14 +177,14 @@ var ATTEND = (function () {
       myTitle: 'My answers', legendNone: 'not answered yet', refresh: 'Refresh',
       notRegMe: 'No name is registered on this device yet',
       notRegTitle: 'Not registered yet',
-      notRegBody: 'Open the “Answer attendance” page and pick your name from the roster. You only do this once.',
-      goForm: 'Go to the attendance page',
+      notRegBody: 'Open “Answer” and pick your name from the roster. You only do this once.',
+      goForm: 'Go to Answer',
       meMy: 'Answers by {name}',
       noOpenTitle: 'No events are open right now',
       unansweredSub: 'You have not answered this event yet',
       editAnswer: 'Change my answer',
 
-      statusTitle: 'Attendance so far',
+      statusTitle: 'Counts',
       footStatus: 'Counts only — who answered is never shown. Before the deadline these numbers still change.',
       noDataTitle: 'Nothing to show yet',
       noDataBody: 'Once events are added, the counts appear here.',
@@ -223,7 +223,7 @@ var ATTEND = (function () {
       sumNamesNote: 'Sirf ginti — kisne jawab diya, yeh kabhi nahi dikhta.',
       failTitle: 'Load nahi hua', retry: 'Dobara try karein',
 
-      answerTitle: 'Attendance bhejein', answerHead: 'Attendance',
+      answerTitle: 'Jawab', answerHead: 'Jawab',
       loadingRoster: 'Roster load ho raha hai…',
       emptyRosterTitle: 'Roster abhi khali hai',
       emptyRosterBody: 'Organiser roster mein naam daalenge, tab aap yahan se chun sakenge.',
@@ -247,14 +247,14 @@ var ATTEND = (function () {
       myTitle: 'Mere jawab', legendNone: 'abhi jawab nahi diya', refresh: 'Refresh',
       notRegMe: 'Is device par abhi koi naam register nahi hai',
       notRegTitle: 'Abhi register nahi hue',
-      notRegBody: '“Attendance bhejein” page kholein aur roster se apna naam chunein. Sirf ek baar karna hai.',
-      goForm: 'Attendance page par jayein',
+      notRegBody: '“Jawab” kholein aur roster se apna naam chunein. Sirf ek baar karna hai.',
+      goForm: '“Jawab” par jayein',
       meMy: '{name} ke jawab',
       noOpenTitle: 'Abhi koi event chalu nahi hai',
       unansweredSub: 'Aapne is event ka jawab nahi diya',
       editAnswer: 'Jawab badlein',
 
-      statusTitle: 'Abhi tak ki attendance',
+      statusTitle: 'Ginti',
       footStatus: 'Sirf ginti — kisne jawab diya yeh nahi dikhta. Last date se pehle ginti badalti rahegi.',
       noDataTitle: 'Abhi dikhane ko kuch nahi',
       noDataBody: 'Event add hone par yahan ginti aayegi.',
