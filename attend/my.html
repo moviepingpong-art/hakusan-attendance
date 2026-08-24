@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title data-i18n-title="myTitle">わたしの回答</title>
-<link rel="stylesheet" href="attend.css?v=20260826">
+<link rel="stylesheet" href="attend.css?v=20260827">
 </head>
 <body>
 
@@ -25,96 +25,27 @@
 
 <div class="wrap" id="wrap"></div>
 
-<script src="attend.js?v=20260826"></script>
+<script src="attend.js?v=20260827"></script>
+<script src="attend-views.js?v=20260827"></script>
 <script>
+/* 中身は attend-views.js にある。まとめた1本（index.html）のタブと同じ実体を使う。
+   ここに描画処理を書き戻さないこと。 */
 (function () {
   'use strict';
 
   var $wrap = document.getElementById('wrap');
-  var $me   = document.getElementById('me');
-  var $org  = document.getElementById('org');
-
-  var esc = ATTEND.esc;
-  var T = ATTEND.t;
-  var device = ATTEND.deviceId();
-  var formUrl = 'index.html?s=' + encodeURIComponent(ATTEND.orgId);
-
   $wrap.innerHTML = ATTEND.loadingHtml();
   if (ATTEND.requireOrgId($wrap)) return;
 
-  document.getElementById('refreshBtn').addEventListener('click', function () { load(true); });
-
-  // 回答フォームから戻ってきたら自動で最新化
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible' && window.__ready) load(true);
+  var view = ATTEND.views.my.create({
+    wrap: $wrap,
+    me:   document.getElementById('me'),
+    org:  document.getElementById('org'),
+    autoRefreshOnVisible: true
   });
 
-  load(false);
-
-  function load(isReload) {
-    $wrap.innerHTML = ATTEND.loadingHtml(isReload ? T('refreshing') : T('loading'));
-
-    ATTEND.get('myanswers', { d: device }).then(function (data) {
-      window.__ready = true;
-      if (data.org) {
-        $org.textContent = data.org;
-        ATTEND.setTitle('myTitle', data.org);
-      }
-
-      if (!data.registered) {
-        $me.innerHTML = '<span>' + esc(T('notRegMe')) + '</span>';
-        $wrap.innerHTML = ATTEND.noteHtml(T('notRegTitle'), T('notRegBody'))
-          + '<a class="ghost" href="' + esc(formUrl) + '">' + esc(T('goForm')) + '</a>';
-        return;
-      }
-
-      var my = T('meMy', { name: '\u0000' }).split('\u0000');
-      $me.innerHTML = '<span>' + esc(my[0]) + '<b>' + esc(data.member.name) + '</b>' + esc(my[1] || '') + '</span>';
-      render(data.myanswers || []);
-    }).catch(function (err) {
-      $wrap.innerHTML = ATTEND.noteHtml(T('failTitle'), String(err && err.message || err), true);
-    });
-  }
-
-  function render(items) {
-    if (!items.length) {
-      $wrap.innerHTML = ATTEND.noteHtml(T('noOpenTitle'), T('noEventsBody'));
-      return;
-    }
-    $wrap.innerHTML = items.map(cardHtml).join('');
-  }
-
-  function cardHtml(ev) {
-    var pill = ev.allAnswered
-      ? '<span class="status st-done">' + esc(T('pillDone')) + '</span>'
-      : '<span class="status st-part">' + esc(T('pillPart')) + '</span>';
-
-    var head = '<div class="card-head' + (ev.answered ? '' : ' no-border') + '">'
-      + '<h2>' + esc(ev.name) + '</h2>'
-      + ATTEND.metaHtml(ev)
-      + (ev.answered ? '<div>' + pill + '</div>' : '')
-      + '</div>';
-
-    // 未回答は「未回答」とだけ大きく出す（フォームへ強制誘導しない）
-    if (!ev.answered) {
-      return '<div class="card">' + head
-        + '<div class="unanswered">'
-        +   '<div class="word">' + esc(T('noAnswer')) + '</div>'
-        +   '<div class="sub">' + esc(T('unansweredSub')) + '</div>'
-        + '</div>'
-        + '</div>';
-    }
-
-    var rows = (ev.items || []).map(function (it) {
-      var b = ATTEND.badge(it.answer);
-      return '<div class="row"><div class="name">' + esc(it.name) + '</div>'
-        + '<div class="ansbadge ' + b.cls + '">' + b.txt + '</div></div>';
-    }).join('');
-
-    return '<div class="card">' + head + rows
-      + '<a class="ghost" href="' + esc(formUrl) + '&e=' + encodeURIComponent(ev.id) + '">' + esc(T('editAnswer')) + '</a>'
-      + '</div>';
-  }
+  document.getElementById('refreshBtn').addEventListener('click', function () { view.load(true); });
+  view.load(false);
 })();
 </script>
 </body>

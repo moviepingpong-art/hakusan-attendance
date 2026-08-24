@@ -119,7 +119,7 @@ ATTEND.addDict({
     /* 配るURL */
     adUrlTitle: 'みなさんに配るURL',
     adUrl1: '① 出欠を入力する', adUrl2: '② わたしの回答', adUrl3: '③ 集まり具合',
-    adUrlHint: 'この3本はずっと変わりません。LINEのリッチメニューに一度貼れば、行事が増えても貼り直しは要りません。',
+    adUrlHint: 'この3本はずっと変わりません。①はタブで3つの画面すべてに行けるので、Webで配るなら①の1本で足ります。②③は、LINEのリッチメニューのように、その画面を直接ひらきたいとき用です。',
 
     /* 名簿 */
     adEditTitle: '団体名とメンバー',
@@ -264,7 +264,7 @@ ATTEND.addDict({
 
     adUrlTitle: 'Links to hand out',
     adUrl1: '1. Answer attendance', adUrl2: '2. My answers', adUrl3: '3. Counts',
-    adUrlHint: 'These three never change. Put them somewhere your members already look, and you never have to replace them as events come and go.',
+    adUrlHint: 'These three never change. Link 1 holds all three screens as tabs, so on the web you only need to hand out link 1. Links 2 and 3 open one screen directly — for a chat menu button, say.',
 
     adEditTitle: 'Group name and members',
     adSave: 'Save', adSaving: 'Saving…', adSaved: 'Saved.',
@@ -405,7 +405,7 @@ ATTEND.addDict({
 
     adUrlTitle: 'Baantne wale link',
     adUrl1: '1. Attendance bhejein', adUrl2: '2. Mere jawab', adUrl3: '3. Ginti',
-    adUrlHint: 'Yeh teen kabhi nahi badalte. Jahan members pehle se dekhte hain wahan laga dein, phir event badalne par bhi badalna nahi padega.',
+    adUrlHint: 'Yeh teen kabhi nahi badalte. Link 1 mein teeno screen tabs ki tarah hain, isliye web par sirf link 1 baantna kaafi hai. Link 2 aur 3 seedha wahi screen kholte hain — jaise chat menu ka button.',
 
     adEditTitle: 'Group ka naam aur members',
     adSave: 'Save karein', adSaving: 'Save ho raha hai…', adSaved: 'Save ho gaya.',

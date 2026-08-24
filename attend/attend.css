@@ -55,6 +55,28 @@ header p{margin:4px 0 0; font-size:13px; opacity:.9; min-height:1.1em;}
 
 .wrap{padding:14px;}
 
+/* ---- 下のタブ（Webで配る1本ぶん） ----
+   3画面を1本のURLにまとめたので、行き来する道が要る。
+   LINEのリッチメニューから来た人には my.html / status.html が今までどおり残っていて、
+   そちらにはタブを出さない（メニューが同じ役目をしているため）。
+   親指の届く下に固定する。iPhoneのホームバーぶんは env(safe-area-inset-bottom) で逃がす。 */
+body.has-tabs{padding-bottom:calc(62px + env(safe-area-inset-bottom));}
+.tabs{
+  position:fixed; left:0; right:0; bottom:0; z-index:10;
+  display:flex; background:#fff; border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -2px 10px rgba(20,40,60,.06);
+}
+.tabs .tab{
+  appearance:none; border:none; background:none; cursor:pointer;
+  flex:1 1 0; min-width:0; padding:11px 4px 12px;
+  font-family:inherit; font-size:13px; font-weight:700; line-height:1.3;
+  color:var(--sub); border-top:3px solid transparent; margin-top:-1px;
+}
+.tabs .tab.on{color:var(--brand-d); border-top-color:var(--brand);}
+.tabs .tab:active{background:#eef5fb;}
+.view[hidden]{display:none;}
+
 /* ---- カード ---- */
 .card{
   background:var(--card); border:1px solid var(--line); border-radius:14px;
