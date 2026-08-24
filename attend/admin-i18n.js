@@ -118,7 +118,7 @@ ATTEND.addDict({
 
     /* 配るURL */
     adUrlTitle: 'みなさんに配るURL',
-    adUrl1: '① 出欠を入力する', adUrl2: '② わたしの回答', adUrl3: '③ 集まり具合',
+    adUrl1: '① 出欠入力', adUrl2: '② わたしの回答', adUrl3: '③ 出欠確認',
     adUrlHint: 'この3本はずっと変わりません。①はタブで3つの画面すべてに行けるので、Webで配るなら①の1本で足ります。②③は、LINEのリッチメニューのように、その画面を直接ひらきたいとき用です。',
 
     /* 名簿 */
@@ -263,7 +263,7 @@ ATTEND.addDict({
     adMyNote: 'When you change phones, or use the app on your Home Screen, copy this and paste it into “Already have a group?”.',
 
     adUrlTitle: 'Links to hand out',
-    adUrl1: '1. Answer attendance', adUrl2: '2. My answers', adUrl3: '3. Counts',
+    adUrl1: '1. Answer', adUrl2: '2. My answers', adUrl3: '3. Counts',
     adUrlHint: 'These three never change. Link 1 holds all three screens as tabs, so on the web you only need to hand out link 1. Links 2 and 3 open one screen directly — for a chat menu button, say.',
 
     adEditTitle: 'Group name and members',
@@ -404,7 +404,7 @@ ATTEND.addDict({
     adMyNote: 'Phone badalne par, ya Home Screen wale app mein, ise copy karke “Pehle se group hai?” mein paste karein.',
 
     adUrlTitle: 'Baantne wale link',
-    adUrl1: '1. Attendance bhejein', adUrl2: '2. Mere jawab', adUrl3: '3. Ginti',
+    adUrl1: '1. Jawab', adUrl2: '2. Mere jawab', adUrl3: '3. Ginti',
     adUrlHint: 'Yeh teen kabhi nahi badalte. Link 1 mein teeno screen tabs ki tarah hain, isliye web par sirf link 1 baantna kaafi hai. Link 2 aur 3 seedha wahi screen kholte hain — jaise chat menu ka button.',
 
     adEditTitle: 'Group ka naam aur members',
