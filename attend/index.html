@@ -5,20 +5,52 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title data-i18n-title="answerTitle">出欠を回答する</title>
-<link rel="stylesheet" href="attend.css?v=20260826">
+<link rel="stylesheet" href="attend.css?v=20260827">
 </head>
-<body>
+<body class="has-tabs">
 
 <header>
-  <h1 data-i18n="answerHead">出欠の回答</h1>
+  <h1 id="h1" data-i18n="answerHead">出欠の回答</h1>
   <p id="org"></p>
 </header>
-<div class="me" id="me"></div>
 
-<div class="wrap" id="wrap"></div>
-<p class="foot" id="foot"></p>
+<!-- ① 出欠入力 -->
+<section class="view" id="v-answer">
+  <div class="me" id="me"></div>
+  <div class="wrap" id="wrap"></div>
+  <p class="foot" id="foot"></p>
+</section>
 
-<script src="attend.js?v=20260826"></script>
+<!-- ② わたしの回答（中身は attend-views.js。my.html と同じ実体） -->
+<section class="view" id="v-my" hidden>
+  <div class="me" id="myMe"></div>
+  <div class="legend">
+    <span class="lg-o"><b>〇</b> <span data-i18n="choiceYes">参加</span></span>
+    <span class="lg-s"><b>△</b> <span data-i18n="choiceMaybe">どちらでも</span></span>
+    <span class="lg-x"><b>×</b> <span data-i18n="choiceNo">不参加</span></span>
+    <span class="lg-n"><b data-i18n="noAnswer">未回答</b> <span data-i18n="legendNone">まだ答えていない</span></span>
+  </div>
+  <div class="bar"><button class="refresh" id="myRefresh" type="button" data-i18n="refresh">最新に更新</button></div>
+  <div class="wrap" id="myWrap"></div>
+</section>
+
+<!-- ③ 集まり具合（中身は attend-views.js。status.html と同じ実体） -->
+<section class="view" id="v-status" hidden>
+  <div class="bar"><button class="refresh" id="stRefresh" type="button" data-i18n="refresh">最新に更新</button></div>
+  <div class="wrap" id="stWrap"></div>
+  <p class="foot" data-i18n="footStatus">※ 人数のみ表示しています（どなたが回答したかは表示されません）。締切前は途中経過のため変わります。</p>
+</section>
+
+<!-- Webで配るのはこの1本だけ。LINEのリッチメニューから来た人は、
+     今までどおり my.html / status.html を直接開く（あちらにタブは出さない）。 -->
+<nav class="tabs" id="tabs">
+  <button class="tab" type="button" data-tab="answer" data-i18n="tabAnswer">出欠入力</button>
+  <button class="tab" type="button" data-tab="my" data-i18n="tabMy">わたしの回答</button>
+  <button class="tab" type="button" data-tab="status" data-i18n="tabStatus">集まり具合</button>
+</nav>
+
+<script src="attend.js?v=20260827"></script>
+<script src="attend-views.js?v=20260827"></script>
 <script>
 (function () {
   'use strict';
@@ -27,6 +59,7 @@
   var $me   = document.getElementById('me');
   var $org  = document.getElementById('org');
   var $foot = document.getElementById('foot');
+  var $h1   = document.getElementById('h1');
 
   var esc = ATTEND.esc;
   var T = ATTEND.t;
@@ -34,9 +67,15 @@
   var member = null;          // {name, gender}
   var events = [];            // 表示中のイベント
   var picks  = {};            // picks[イベントID][種目] = '〇' | '△' | '×'
+  var orgName = '';
 
   $wrap.innerHTML = ATTEND.loadingHtml();
-  if (ATTEND.requireOrgId($wrap)) return;
+  if (ATTEND.requireOrgId($wrap)) {
+    // ?s= が無ければどのタブも開けない。道だけ残しても空振りするので畳む
+    document.getElementById('tabs').hidden = true;
+    document.body.classList.remove('has-tabs');
+    return;
+  }
 
   $wrap.addEventListener('click', onTap);   // 委譲は1回だけ登録する（再描画しても増やさない）
   $wrap.addEventListener('keydown', function (e) {
@@ -44,7 +83,108 @@
     var c = e.target.closest('.choice');
     if (c) { e.preventDefault(); choose(c); }
   });
-  load();
+
+  /* ============================================================
+   *  タブ
+   *  3つの画面をそれぞれの器に持たせ、切り替えでは中身を捨てない。
+   *  ひとつの器を使い回すと、回答の途中で「集まり具合」を見に行った人が
+   *  戻ったときに、まだ送っていない〇△×を失う。
+   * ========================================================== */
+
+  var TABS = {
+    answer: { box: 'v-answer', head: 'answerHead',  title: 'answerTitle' },
+    my:     { box: 'v-my',     head: 'myTitle',     title: 'myTitle' },
+    status: { box: 'v-status', head: 'statusTitle', title: 'statusTitle' }
+  };
+
+  var answerLoaded = false;
+  var myView = null;
+  var statusView = null;
+
+  function tabFromHash() {
+    var h = String(location.hash || '').replace(/^#/, '');
+    return TABS[h] ? h : 'answer';
+  }
+
+  function showTab(name, keepHash) {
+    if (!TABS[name]) name = 'answer';
+
+    Object.keys(TABS).forEach(function (k) {
+      document.getElementById(TABS[k].box).hidden = (k !== name);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs .tab'), function (b) {
+      var on = b.getAttribute('data-tab') === name;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-current', on ? 'page' : 'false');
+    });
+
+    // 見出しはタブに合わせて変える。data-i18n も付け替えておかないと、
+    // あとで団体の言語が届いたときに applyDom が「出欠の回答」に戻してしまう
+    $h1.setAttribute('data-i18n', TABS[name].head);
+    $h1.textContent = T(TABS[name].head);
+    ATTEND.setTitle(TABS[name].title, orgName);
+
+    if (!keepHash) {
+      // 履歴は積まない。LINE内ブラウザでは「戻る」が閉じるに近い意味を持つので、
+      // タブを替えただけで戻る回数が増えるのは邪魔になる
+      var base = location.pathname + location.search;
+      try { history.replaceState(null, '', name === 'answer' ? base : base + '#' + name); } catch (e) { /* noop */ }
+    }
+
+    if (name === 'answer') {
+      if (!answerLoaded) { answerLoaded = true; load(); }
+      return;
+    }
+    if (name === 'my') {
+      if (!myView) {
+        myView = ATTEND.views.my.create({
+          wrap: document.getElementById('myWrap'),
+          me:   document.getElementById('myMe'),
+          org:  $org
+        });
+      }
+      myView.load(false);
+      return;
+    }
+    if (!statusView) {
+      statusView = ATTEND.views.status.create({
+        wrap: document.getElementById('stWrap'),
+        org:  $org
+      });
+    }
+    statusView.load(false);
+  }
+
+  document.getElementById('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('.tab');
+    if (b) showTab(b.getAttribute('data-tab'));
+  });
+  window.addEventListener('hashchange', function () { showTab(tabFromHash(), true); });
+
+  document.getElementById('myRefresh').addEventListener('click', function () { if (myView) myView.load(true); });
+  document.getElementById('stRefresh').addEventListener('click', function () { if (statusView) statusView.load(true); });
+
+  // 「わたしの回答」から回答フォームへ戻る導線。行事を指していないもの（未登録の案内）は
+  // ページを読み直さずタブを替えるだけでよい。行事ごとの「回答を変更する」は
+  // ?e= を付けて開き直す必要があるので、そのまま移らせる
+  document.getElementById('v-my').addEventListener('click', function (e) {
+    if (!e.target.closest('[data-goform="list"]')) return;
+    e.preventDefault();
+    showTab('answer');
+  });
+
+  // ほかの画面から戻ってきたら、開いているタブだけ最新化する
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    if (myView && !document.getElementById('v-my').hidden) myView.load(true);
+    if (statusView && !document.getElementById('v-status').hidden) statusView.load(true);
+  });
+
+  showTab(tabFromHash(), true);
+
+  /* ============================================================
+   *  ここから下は出欠入力。まとめる前の index.html のまま
+   * ========================================================== */
 
   /* ===== 読み込み ===== */
   function load() {
@@ -65,6 +205,7 @@
 
   function setOrg(org) {
     if (!org) return;
+    orgName = org;
     $org.textContent = org;
     ATTEND.setTitle('answerTitle', org);
   }

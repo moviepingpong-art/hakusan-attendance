@@ -117,7 +117,10 @@ var ATTEND = (function () {
       statusTitle: '出欠の状況',
       footStatus: '※ 人数のみ表示しています（どなたが回答したかは表示されません）。締切前は途中経過のため変わります。',
       noDataTitle: '表示できる出欠データがありません',
-      noDataBody: 'イベントが登録されると、ここに集計が出ます。'
+      noDataBody: 'イベントが登録されると、ここに集計が出ます。',
+
+      /* まとめた1本（index.html）のタブ。LINEのリッチメニューの呼び名にそろえてある */
+      tabAnswer: '出欠入力', tabMy: 'わたしの回答', tabStatus: '集まり具合'
     },
 
     en: {
@@ -184,7 +187,9 @@ var ATTEND = (function () {
       statusTitle: 'Attendance so far',
       footStatus: 'Counts only — who answered is never shown. Before the deadline these numbers still change.',
       noDataTitle: 'Nothing to show yet',
-      noDataBody: 'Once events are added, the counts appear here.'
+      noDataBody: 'Once events are added, the counts appear here.',
+
+      tabAnswer: 'Answer', tabMy: 'My answers', tabStatus: 'Counts'
     },
 
     'in': {
@@ -252,7 +257,9 @@ var ATTEND = (function () {
       statusTitle: 'Abhi tak ki attendance',
       footStatus: 'Sirf ginti — kisne jawab diya yeh nahi dikhta. Last date se pehle ginti badalti rahegi.',
       noDataTitle: 'Abhi dikhane ko kuch nahi',
-      noDataBody: 'Event add hone par yahan ginti aayegi.'
+      noDataBody: 'Event add hone par yahan ginti aayegi.',
+
+      tabAnswer: 'Jawab', tabMy: 'Mere jawab', tabStatus: 'Ginti'
     }
   };
 
