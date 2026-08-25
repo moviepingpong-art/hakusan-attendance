@@ -4,48 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title data-i18n-title="myTitle">わたしの回答</title>
-<link rel="stylesheet" href="attend.css?v=20260828">
+<title>わたしの回答</title>
 </head>
 <body>
-
-<header>
-  <h1 data-i18n="myTitle">わたしの回答</h1>
-  <p id="org"></p>
-</header>
-<div class="me" id="me"></div>
-
-<div class="legend">
-  <span class="lg-o"><b>〇</b> <span data-i18n="choiceYes">参加</span></span>
-  <span class="lg-s"><b>△</b> <span data-i18n="choiceMaybe">どちらでも</span></span>
-  <span class="lg-x"><b>×</b> <span data-i18n="choiceNo">不参加</span></span>
-  <span class="lg-n"><b data-i18n="noAnswer">未回答</b> <span data-i18n="legendNone">まだ答えていない</span></span>
-</div>
-<div class="bar"><button class="refresh" id="refreshBtn" type="button" data-i18n="refresh">最新に更新</button></div>
-
-<div class="wrap" id="wrap"></div>
-
-<script src="attend.js?v=20260828"></script>
-<script src="attend-views.js?v=20260828"></script>
 <script>
-/* 中身は attend-views.js にある。まとめた1本（index.html）のタブと同じ実体を使う。
-   ここに描画処理を書き戻さないこと。 */
+/* 2026-08-25：配るURLを1本にまとめたので、このページは**転送だけ**になった。
+   リッチメニューやブックマークに残っている古いリンクを、まとめた1本の該当タブへ送る。
+   同じオリジンなので、端末の記憶（名前の選択）はそのまま引き継がれる。
+   踏まれなくなったら消してよいが、消すと古いリンクが404になる。 */
 (function () {
   'use strict';
-
-  var $wrap = document.getElementById('wrap');
-  $wrap.innerHTML = ATTEND.loadingHtml();
-  if (ATTEND.requireOrgId($wrap)) return;
-
-  var view = ATTEND.views.my.create({
-    wrap: $wrap,
-    me:   document.getElementById('me'),
-    org:  document.getElementById('org'),
-    autoRefreshOnVisible: true
-  });
-
-  document.getElementById('refreshBtn').addEventListener('click', function () { view.load(true); });
-  view.load(false);
+  var p = new URLSearchParams(window.location.search);
+  var s = String(p.get('s') || '').trim();
+  var e = String(p.get('e') || '').trim();
+  var q = s ? ('?s=' + encodeURIComponent(s) + (e ? '&e=' + encodeURIComponent(e) : '')) : '';
+  // replace にする。戻るを押したときに、この転送ページへ戻らせない
+  window.location.replace('./' + q + '#my');
 })();
 </script>
 </body>

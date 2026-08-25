@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260828">
+<link rel="stylesheet" href="attend.css?v=20260829">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -201,17 +201,11 @@
     <!-- 配るURL -->
     <section class="step">
       <h2 data-i18n="adUrlTitle">みなさんに配るURL</h2>
+      <!-- 2026-08-25：3本 → 1本。この1本にタブが付いていて、出欠入力・わたしの回答・
+           出欠確認のすべてに行ける。my.html / status.html は転送ページとして残してある -->
       <div class="urlbox">
-        <div class="t" data-i18n="adUrl1">① 出欠を入力する</div>
+        <div class="t" data-i18n="adUrl1">出欠のページ</div>
         <div class="u"><input id="u1" type="text" readonly><button class="btn" data-copy="u1" type="button" data-i18n="adCopy">コピー</button></div>
-      </div>
-      <div class="urlbox">
-        <div class="t" data-i18n="adUrl2">② わたしの回答</div>
-        <div class="u"><input id="u2" type="text" readonly><button class="btn" data-copy="u2" type="button" data-i18n="adCopy">コピー</button></div>
-      </div>
-      <div class="urlbox">
-        <div class="t" data-i18n="adUrl3">③ 集まり具合</div>
-        <div class="u"><input id="u3" type="text" readonly><button class="btn" data-copy="u3" type="button" data-i18n="adCopy">コピー</button></div>
       </div>
       <p class="hint" data-i18n="adUrlHint"></p>
     </section>
@@ -255,8 +249,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260828"></script>
-<script src="admin-i18n.js?v=20260828"></script>
+<script src="attend.js?v=20260829"></script>
+<script src="admin-i18n.js?v=20260829"></script>
 <script>
 (function () {
   'use strict';
@@ -518,8 +512,6 @@
       // 合鍵はこの端末にしか無い。サーバーは SHA-256 しか持っていないので、組み立てはここで
       $('myUrl').value = d.urls.admin || (d.urls.list.replace(/\/\?s=/, '/admin.html?s=') + '#k=' + encodeURIComponent(adminKey));
       $('u1').value = d.urls.list;
-      $('u2').value = d.urls.my;
-      $('u3').value = d.urls.status;
 
       $edRows.innerHTML = '';
       (d.members || []).forEach(function (m) { memberRow($edRows, m); });

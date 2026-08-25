@@ -39,9 +39,8 @@ LINE公式アカウントのリッチメニューに貼っておけば、行事�
 | ファイル | 役割 | 対象 |
 |---|---|---|
 | `attend/index.html` | 参加者の3画面をタブで束ねた1本（`e` ありでイベント個別／なしで一覧） | 参加者 |
-| `attend/my.html` | わたしの回答**だけ**を開く。リッチメニュー用 | 参加者 |
-| `attend/status.html` | 集計**だけ**を開く（人数のみ・個人名なし）。リッチメニュー用 | だれでも |
-| `attend/attend-views.js` | 「わたしの回答」「出欠確認」の中身。上の3ページが共有する | — |
+| `attend/my.html` `attend/status.html` | **転送だけ**。古いリンクを `index.html` の該当タブへ送る | — |
+| `attend/attend-views.js` | 「わたしの回答」「出欠確認」の中身。`index.html` のタブが使う | — |
 | `attend/admin.html` | 主催者の管理画面。団体づくり・名簿・行事・出欠・集計・削除 | 主催者 |
 | `attend/setup.html` | `admin.html` への転送だけ（外から張られた古いリンク用） | — |
 | `attend/attend.js` `attend/attend.css` | 共通ロジック・共通スタイル | — |
@@ -53,19 +52,17 @@ LINE公式アカウントのリッチメニューに貼っておけば、行事�
 ## URL
 
 ```
-Web用の1本： https://app.dropper-tools.com/attend/?s={団体ID}
-イベント個別： https://app.dropper-tools.com/attend/?s={団体ID}&e={イベントID}
-わたしの回答： https://app.dropper-tools.com/attend/my.html?s={団体ID}
-集計　　　　： https://app.dropper-tools.com/attend/status.html?s={団体ID}
-管理　　　　： https://app.dropper-tools.com/attend/admin.html?s={団体ID}#k={合鍵}
+配るのはこれ： https://app.dropper-tools.com/attend/?s={団体ID}
+イベント個別　： https://app.dropper-tools.com/attend/?s={団体ID}&e={イベントID}
+管理　　　　　： https://app.dropper-tools.com/attend/admin.html?s={団体ID}#k={合鍵}
 ```
 
-**上の4本は配ってよいもの。管理リンクだけは配ってはいけません。**
+**配るのは1本目だけ。管理リンクは配ってはいけません。**
 
-Webで配るなら**1本目だけでよい**。下のタブで「出欠入力／わたしの回答／出欠確認」を
-行き来できる（`#my` `#status` を付ければ、その画面を開いた状態で始まる）。
-`my.html` と `status.html` は、LINEのリッチメニューのように**その画面だけを直接ひらきたいとき**に使う。
-中身は `attend-views.js` を共有しているので、どちらから来ても同じ画面になる。
+下のタブで「出欠入力／わたしの回答／出欠確認」を行き来できます
+（`#my` `#status` を付ければ、その画面を開いた状態で始まります）。
+`my.html` / `status.html` は 2026-08-25 に**転送ページ**になりました。古いリンクを踏んでも
+同じ1本の該当タブに着きます（同じオリジンなので端末の記憶も引き継がれます）。
 団体IDを知っていれば名簿の氏名は見えます（推測できない長さにしてあります）。
 合鍵は `#` のうしろに置いてあり、サーバーには送られません。
 
