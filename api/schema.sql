@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS orgs (
   name        TEXT NOT NULL DEFAULT '出欠',
   tz          TEXT NOT NULL DEFAULT 'Asia/Tokyo',
   lang        TEXT NOT NULL DEFAULT 'ja',      -- 参加者に配る画面の言語（ja / en / in）
+  -- 回答者の名前を参加者にも見せるか。0=伏せる（男女の数だけ）／1=見せる。
+  -- **主催者の管理画面は、この設定に関わらず必ず名前が出る**（メンバー選定に要るため）
+  show_names  INTEGER NOT NULL DEFAULT 0,
   created_at  INTEGER NOT NULL,
   seen_at     INTEGER NOT NULL                -- 最終アクセス。放置ぶんの自動削除に使う
 );
@@ -87,3 +90,18 @@ CREATE TABLE IF NOT EXISTS answers (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_answers_ev ON answers (org_id, event_id, name, item, id DESC);
+
+-- 参加者の一言。追記式、最新行を採用 -----------------------------------
+-- answers は種目ごとに1行だが、コメントは人につき1つなので別に持つ
+-- （answers に列を足すと、種目3つの行事で同じ文が3回入る）。
+-- 消したいときは空文字を1行足す（最新行が空＝コメント無し）。
+CREATE TABLE IF NOT EXISTS notes (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  org_id     TEXT NOT NULL,
+  event_id   TEXT NOT NULL,
+  name       TEXT NOT NULL,                   -- 名簿の氏名。端末が変わっても追える
+  text       TEXT NOT NULL DEFAULT '',
+  device_id  TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notes_ev ON notes (org_id, event_id, name, id DESC);

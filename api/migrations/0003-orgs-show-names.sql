@@ -1,0 +1,15 @@
+-- 回答者の名前を参加者にも見せるかどうか（団体ごとに1つ）。
+--
+-- 0 = 伏せる（今までどおり。参加者には男女の数だけ）
+-- 1 = 見せる（誰が〇／△／× かを名前で出す）
+--
+-- **既定は 0。** 既存の団体の見え方が、流した瞬間に黙って変わらないようにするため。
+-- 主催者の管理画面は、この設定に関わらず**必ず名前が出る**（大会のメンバー選定に要るため）。
+--
+-- schema.sql は CREATE TABLE IF NOT EXISTS なので、**すでにある orgs には列が増えない**。
+-- 本番に流すのはこちら。`git pull` → これを流す → `wrangler deploy` の順を守ること。
+--
+--   npx wrangler d1 execute dropper-attendance --remote --file=./migrations/0003-orgs-show-names.sql
+--
+-- 二度流しても duplicate column name で止まるだけで、害はない。
+ALTER TABLE orgs ADD COLUMN show_names INTEGER NOT NULL DEFAULT 0;

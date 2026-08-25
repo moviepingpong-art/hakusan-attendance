@@ -77,6 +77,15 @@ var ATTEND = (function () {
       sumResp: '回答した人：{n}人', sumResp1: '回答した人：{n}人',
       sumTotal: '計 ', sumMale: '男 ', sumFemale: '女 ',
       sumUnknown: '※ 性別が名簿にない回答 {n}件を含みます（男女の内訳に未反映）',
+      // 誰が〇・△・×か。**主催者が「名前を見せる」を選んだ団体にだけ出る**
+      joinName: '、', noteSep: '：', notesHead: 'みなさんの一言',
+      // 一言。任意。印を選ばずにここだけ書いても送れない（回答が本体）
+      noteLabel: '一言（任意）',
+      notePh: '例：30分ほど遅れます／車を2台出せます',
+      noteHint: '主催者に伝わります。空のまま送ってもかまいません。',
+      // 名簿の隣の行を押し間違えたときの歯止め。塞がずに聞くだけ
+      nameTakenAsk: '「{name}」さんは、すでに別の端末で使われています。\nご本人（機種変更など）ですか？\n\n別の方の場合は「キャンセル」を押して、ご自分のお名前を選び直してください。',
+      nameTakenAgain: 'お名前を選び直してください。',
       sumNamesNote: '※ 人数のみ表示しています（どなたが回答したかは表示されません）。',
       failTitle: '読み込めませんでした', retry: 'もう一度読み込む',
 
@@ -116,6 +125,8 @@ var ATTEND = (function () {
       /* 集まり具合 */
       statusTitle: '出欠確認',
       footStatus: '※ 人数のみ表示しています（どなたが回答したかは表示されません）。締切前は途中経過のため変わります。',
+      // 主催者が「名前を見せる」を選んだ団体の脚注。伏せる団体の文が嘘にならないよう分けてある
+      footStatusNames: '※ まだ答えていない方のお名前は出ません。締切前は途中経過のため変わります。',
       noDataTitle: '表示できる出欠データがありません',
       noDataBody: 'イベントが登録されると、ここに集計が出ます。',
 
@@ -150,6 +161,12 @@ var ATTEND = (function () {
       sumResp: '{n} people answered', sumResp1: '{n} person answered',
       sumTotal: 'All ', sumMale: 'M ', sumFemale: 'F ',
       sumUnknown: 'Includes {n} answers from people with no gender on the roster (not counted in M/F).',
+      joinName: ', ', noteSep: ': ', notesHead: 'Notes from members',
+      noteLabel: 'Note (optional)',
+      notePh: 'e.g. Running 30 minutes late / I can bring two cars',
+      noteHint: 'The organiser will see this. You can leave it empty.',
+      nameTakenAsk: '“{name}” is already in use on another device.\nIs this you (a new phone, for example)?\n\nIf not, choose Cancel and pick your own name.',
+      nameTakenAgain: 'Please pick your own name.',
       sumNamesNote: 'Counts only — who answered is never shown.',
       failTitle: 'Could not load', retry: 'Try again',
 
@@ -186,6 +203,7 @@ var ATTEND = (function () {
 
       statusTitle: 'Counts',
       footStatus: 'Counts only — who answered is never shown. Before the deadline these numbers still change.',
+      footStatusNames: 'Names of people who have not answered are never shown. Before the deadline this still changes.',
       noDataTitle: 'Nothing to show yet',
       noDataBody: 'Once events are added, the counts appear here.',
 
@@ -220,6 +238,12 @@ var ATTEND = (function () {
       sumResp: '{n} logon ne jawab diya', sumResp1: '{n} vyakti ne jawab diya',
       sumTotal: 'Total ', sumMale: 'M ', sumFemale: 'F ',
       sumUnknown: 'Isme {n} aise jawab hain jinka gender roster mein nahi hai (M/F mein nahi gine).',
+      joinName: ', ', noteSep: ': ', notesHead: 'Members ki baat',
+      noteLabel: 'Ek baat (optional)',
+      notePh: 'jaise: 30 minute late aaunga / do gaadi la sakta hoon',
+      noteHint: 'Organiser ko dikhega. Khali chhod sakte hain.',
+      nameTakenAsk: '“{name}” pehle se kisi aur device par use ho raha hai.\nKya yeh aap hain (naya phone waghera)?\n\nAgar nahi, to Cancel dabakar apna naam chunein.',
+      nameTakenAgain: 'Apna naam chunein.',
       sumNamesNote: 'Sirf ginti — kisne jawab diya, yeh kabhi nahi dikhta.',
       failTitle: 'Load nahi hua', retry: 'Dobara try karein',
 
@@ -256,6 +280,7 @@ var ATTEND = (function () {
 
       statusTitle: 'Ginti',
       footStatus: 'Sirf ginti — kisne jawab diya yeh nahi dikhta. Last date se pehle ginti badalti rahegi.',
+      footStatusNames: 'Jinhone jawab nahi diya unke naam nahi dikhte. Last date se pehle yeh badalta rahega.',
       noDataTitle: 'Abhi dikhane ko kuch nahi',
       noDataBody: 'Event add hone par yahan ginti aayegi.',
 
@@ -547,26 +572,58 @@ var ATTEND = (function () {
                      : '<span class="badge live">' + esc(t('sumLive')) + '</span>')
       + '<span>' + esc(t(n === 1 ? 'sumResp1' : 'sumResp', { n: n })) + '</span></div>';
 
+    /* 回答した人の名前。**あるときだけ出す。**
+       出すかどうかは主催者が団体の設定で決めていて、伏せる団体には `answered` が届かない
+       （サーバーが入れない。画面で隠しているのではない）。
+       ★ ここに出るのは**回答した人**だけ。まだ答えていない人の名前は、
+         設定に関わらず参加者には渡ってこない。 */
+    var who = sum.answered || null;
+
     var body = (sum.items || []).map(function (it) {
       return '<div class="sum-item"><div class="name">' + esc(it.name) + '</div>'
-        + sumRow('maru', '〇 ' + t('choiceYes'), it.maru)
-        + sumRow('sankaku', '△ ' + t('choiceMaybe'), it.sankaku)
-        + sumRow('batsu', '× ' + t('choiceNo'), it.batsu)
+        + sumRow('maru', '〇 ' + t('choiceYes'), it.maru, who, it.name, '〇')
+        + sumRow('sankaku', '△ ' + t('choiceMaybe'), it.sankaku, who, it.name, '△')
+        + sumRow('batsu', '× ' + t('choiceNo'), it.batsu, who, it.name, '×')
         + unknownNote(it)
         + '</div>';
     }).join('');
 
-    return head + body + '</div>';
+    return head + body + notesBlock(who) + '</div>';
   }
 
-  function sumRow(cls, label, o) {
+  /* 誰がその印を選んだか。名前を伏せる団体では who が null なので、何も出ない */
+  function whoLine(who, item, mark) {
+    if (!who) return '';
+    var names = [];
+    for (var i = 0; i < who.length; i++) {
+      if ((who[i].ans || {})[item] === mark) names.push(who[i].name);
+    }
+    if (!names.length) return '';
+    return '<div class="sum-who">' + esc(names.join(t('joinName'))) + '</div>';
+  }
+
+  /* 参加者どうしの一言。名前を見せる団体だけに出る（誰の言葉か分からないと意味が薄いため） */
+  function notesBlock(who) {
+    if (!who) return '';
+    var lines = [];
+    for (var i = 0; i < who.length; i++) {
+      if (who[i].note) {
+        lines.push('<p class="sum-note"><b>' + esc(who[i].name) + '</b>' + esc(t('noteSep')) + esc(who[i].note) + '</p>');
+      }
+    }
+    if (!lines.length) return '';
+    return '<div class="sum-notes"><div class="h">' + esc(t('notesHead')) + '</div>' + lines.join('') + '</div>';
+  }
+
+  function sumRow(cls, label, o, who, item, mark) {
     var v = o || { m: 0, f: 0, u: 0 };
     var total = (v.m || 0) + (v.f || 0) + (v.u || 0);
     return '<div class="sum-row"><span class="lab ' + cls + '">' + esc(label) + '</span><div class="nums">'
       + '<span class="pill"><span class="total">' + esc(t('sumTotal')) + total + '</span></span>'
       + '<span class="pill">' + esc(t('sumMale')) + '<span class="m">' + (v.m || 0) + '</span></span>'
       + '<span class="pill">' + esc(t('sumFemale')) + '<span class="f">' + (v.f || 0) + '</span></span>'
-      + '</div></div>';
+      + '</div></div>'
+      + whoLine(who, item, mark);
   }
 
   function unknownNote(it) {
