@@ -96,6 +96,7 @@ async function handlePost(b, env) {
     case 'deleteEvent': return await deleteEvent(env, b);
     case 'tally':       return await tally(env, b);
     case 'closeEvent':  return await closeEvent(env, b);
+    case 'saveEventMemo': return await saveEventMemo(env, b);
     case 'deleteOrg':   return await deleteOrg(env, b);
     default:
       return bad('badAction', '対応していない呼び出しです（' + action + '）。', { a: action });
@@ -500,7 +501,9 @@ async function createEventFromTaikai(env, b) {
     items,
     youkou: t.youkou,
     place: t.place,
-    address: t.address
+    address: t.address,
+    // 要項の備考を連絡事項の下書きにする。あとから管理画面で直せる
+    memo: (o.memo != null ? o.memo : t.memo)
   });
 
   await env.DB.prepare('UPDATE taikai SET event_id = ? WHERE org_id = ? AND id = ?')
@@ -605,6 +608,24 @@ async function deleteEvent(env, b) {
   await touch(env, org.row.id);
 
   return { ok: true, deleted: true, name: ev.name, lost };
+}
+
+/** 主催者からの連絡事項を書き換える。
+ *  **締切後でも書ける**（「駐車場が変わりました」を締切のあとに伝えることがある）。
+ *  空文字を送れば消える。回答そのものには一切触らない。 */
+async function saveEventMemo(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const ev = await findEvent(env, org.row.id, b.eventId);
+  if (!ev) return notFoundEvent();
+
+  const memo = cleanMemo(b.memo);
+  await env.DB.prepare('UPDATE events SET memo = ? WHERE org_id = ? AND id = ?')
+    .bind(memo, org.row.id, ev.id).run();
+  await touch(env, org.row.id);
+
+  return { ok: true, memo };
 }
 
 /** 手じまい。締切前でも締め切りたいときと、締切後に開け直したいときの両方に使う */
@@ -756,7 +777,7 @@ function normalizeMembers(raw) {
  *  date/deadline は中では 'YYYY-MM-DD'、外に出すときは GAS版と同じ 'YYYY/MM/DD（曜）'。 */
 async function eventsOf(env, orgId, lang) {
   const r = await env.DB.prepare(
-    'SELECT id, name, date, deadline, items, youkou, place, address, closed FROM events WHERE org_id = ?'
+    'SELECT id, name, date, deadline, items, youkou, place, address, memo, closed FROM events WHERE org_id = ?'
   ).bind(orgId).all();
 
   return (r.results || []).map(e => ({
@@ -770,6 +791,8 @@ async function eventsOf(env, orgId, lang) {
     youkou: e.youkou || '',
     place: e.place || '',
     address: e.address || '',
+    // 主催者からの連絡事項。締切後も読めるようにする（あとから経緯を確かめる人がいる）
+    memo: e.memo || '',
     // 手じまい（closed列）と、締切をすぎたかどうか。どちらでも締切扱いにする。
     // ただし**理由は分けて持つ**。主催者の画面で「手で締めた」のか
     // 「日が過ぎた」のかが分からないと、再開できるのかどうか判断できない
@@ -796,6 +819,7 @@ async function taikaiOf(env, orgId, lang) {
     deadlineText: fmtDate(t.deadline, lang),
     place: t.place || '',
     address: addressOf(t.detail),
+    memo: memoOf(t.detail),
     items: splitItems(t.items),
     itemsRaw: splitItems(t.items),
     youkou: t.youkou || '',
@@ -838,10 +862,10 @@ async function addEventRow(env, orgId, a) {
 
   const id = 'ev' + randomId(8);
   await env.DB.prepare(
-    'INSERT INTO events (org_id,id,name,date,deadline,items,youkou,place,address,closed,created_at)'
-    + ' VALUES (?,?,?,?,?,?,?,?,?,0,?)'
+    'INSERT INTO events (org_id,id,name,date,deadline,items,youkou,place,address,memo,closed,created_at)'
+    + ' VALUES (?,?,?,?,?,?,?,?,?,?,0,?)'
   ).bind(orgId, id, a.name, a.date, a.deadline, a.items.join('、'),
-         a.youkou || '', a.place || '', a.address || '', Date.now()).run();
+         a.youkou || '', a.place || '', a.address || '', cleanMemo(a.memo), Date.now()).run();
 
   return { ok: true, eventId: id, existing: false };
 }
@@ -940,6 +964,9 @@ function publicEvent(ev, mine, myNote) {
     items: ev.items, youkou: ev.youkou, place: ev.place, address: ev.address,
     // 地図とカレンダーのボタンを画面側で組み立てるため、生の日付も渡す
     dateRaw: ev.date, closed: ev.closed, mine: mine || null,
+    // 主催者からの連絡事項。**団体の設定に関わらず全員に見せる**
+    // （名前の開示は「誰が回答したか」の話で、こちらは行事そのものの案内）
+    memo: ev.memo || '',
     // 自分が前に書いた一言。書き直せるよう、そのまま入力欄に戻す
     myNote: myNote || ''
   };
@@ -973,7 +1000,9 @@ function summaryOf(ev, byName, genders, withNames, notes) {
 
   const out = {
     id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText,
-    youkou: ev.youkou, closed: ev.closed, respCount: keys.length, items
+    youkou: ev.youkou, closed: ev.closed, respCount: keys.length, items,
+    // 主催者からの連絡事項。出欠確認の画面にも出す（回答したあとに見に来る人がいる）
+    memo: ev.memo || ''
   };
 
   if (withNames) {
@@ -1067,6 +1096,25 @@ function addressOf(detail) {
   } catch (e) {
     return '';
   }
+}
+
+/** ドロッパーが読み取った要項の備考。主催者のメモの**下書き**に使う。
+ *  そのまま出すのではなく、出欠を作るときに写して、あとは主催者が直せるようにしてある
+ *  （要項の備考が連絡事項として適切とは限らないため）。 */
+function memoOf(detail) {
+  if (!detail) return '';
+  try {
+    const o = JSON.parse(detail);
+    return String((o && o.note) || '').trim();
+  } catch (e) {
+    return '';
+  }
+}
+
+/** 主催者のメモを整える。参加者の一言（200字）より長めに採る。
+ *  連絡事項は複数行になることがあり、短すぎると途中で切れて意味が変わる。 */
+function cleanMemo(v) {
+  return String(v == null ? '' : v).replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 500);
 }
 
 function normUrl(v) {

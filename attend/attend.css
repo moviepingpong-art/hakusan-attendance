@@ -205,6 +205,13 @@ body.has-tabs{padding-bottom:calc(62px + env(safe-area-inset-bottom));}
 .sum-item .name{font-weight:700; margin-bottom:8px; font-size:16px;}
 .sum-row{display:grid; grid-template-columns:104px 1fr; gap:8px; align-items:center; margin:6px 0;}
 .sum-row .lab{font-size:14px; font-weight:700;}
+/* 主催者からの連絡事項。要項ボタンより**先に**読ませたいので、枠で囲って目に留める。
+   ★ 団体の「名前を伏せる」設定には従わない（あれは誰が回答したかの話で、これは行事の案内）。
+   ★ 改行はそのまま出す（連絡事項は箇条書きになることがある）。 */
+.evmemo{margin:12px 0 0; padding:10px 12px; border-radius:10px;
+        background:var(--sankaku-bg); border:1px solid var(--sankaku);}
+.evmemo .h{font-size:12.5px; font-weight:700; color:var(--sankaku); margin:0 0 4px;}
+.evmemo .b{margin:0; font-size:14.5px; line-height:1.6; white-space:pre-line; word-break:break-word;}
 /* 誰がその印を選んだか。**主催者が「名前を見せる」を選んだ団体にだけ出る**
    （伏せる団体にはサーバーが名前を返さないので、ここは空のまま）。
    数の行の下に、1段下げて添える。数のとなりに並べると、人数が読み取りにくくなる。 */

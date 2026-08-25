@@ -79,6 +79,8 @@ var ATTEND = (function () {
       sumUnknown: '※ 性別が名簿にない回答 {n}件を含みます（男女の内訳に未反映）',
       // 誰が〇・△・×か。**主催者が「名前を見せる」を選んだ団体にだけ出る**
       joinName: '、', noteSep: '：', notesHead: 'みなさんの一言',
+      // 主催者からの連絡事項。要項に書いていない、その回だけのこと
+      memoHead: '主催者からの連絡',
       // 一言。任意。印を選ばずにここだけ書いても送れない（回答が本体）
       noteLabel: '一言（任意）',
       notePh: '例：30分ほど遅れます／車を2台出せます',
@@ -162,6 +164,7 @@ var ATTEND = (function () {
       sumTotal: 'All ', sumMale: 'M ', sumFemale: 'F ',
       sumUnknown: 'Includes {n} answers from people with no gender on the roster (not counted in M/F).',
       joinName: ', ', noteSep: ': ', notesHead: 'Notes from members',
+      memoHead: 'From the organiser',
       noteLabel: 'Note (optional)',
       notePh: 'e.g. Running 30 minutes late / I can bring two cars',
       noteHint: 'The organiser will see this. You can leave it empty.',
@@ -239,6 +242,7 @@ var ATTEND = (function () {
       sumTotal: 'Total ', sumMale: 'M ', sumFemale: 'F ',
       sumUnknown: 'Isme {n} aise jawab hain jinka gender roster mein nahi hai (M/F mein nahi gine).',
       joinName: ', ', noteSep: ': ', notesHead: 'Members ki baat',
+      memoHead: 'Organiser ki taraf se',
       noteLabel: 'Ek baat (optional)',
       notePh: 'jaise: 30 minute late aaunga / do gaadi la sakta hoon',
       noteHint: 'Organiser ko dikhega. Khali chhod sakte hain.',
@@ -550,6 +554,17 @@ var ATTEND = (function () {
     return 'https://calendar.google.com/calendar/render?' + p;
   }
 
+  /** 主催者からの連絡事項。要項に書いていない、その回だけのこと。
+      **団体の「名前を伏せる」設定には従わない**——あれは「誰が回答したか」の話で、
+      こちらは行事そのものの案内。伏せる団体でも全員に見せる。
+      無ければ枠ごと出さない（空の見出しだけが残らないように）。 */
+  function memoHtml(ev) {
+    var s = (ev && ev.memo) ? String(ev.memo).trim() : '';
+    if (!s) return '';
+    return '<div class="evmemo"><div class="h">' + esc(t('memoHead')) + '</div>'
+      + '<p class="b">' + esc(s) + '</p></div>';
+  }
+
   /** 回答画面に並べるボタン。無いものは出さない。 */
   function linksHtml(ev) {
     var b = [];
@@ -674,6 +689,7 @@ var ATTEND = (function () {
     badge: badge,
     dueSuffix: dueSuffix,
     metaHtml: metaHtml,
+    memoHtml: memoHtml,
     linksHtml: linksHtml,
     summaryHtml: summaryHtml,
     noteHtml: noteHtml,

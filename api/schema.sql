@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS events (
   youkou     TEXT NOT NULL DEFAULT '',        -- 要項へのリンク
   place      TEXT NOT NULL DEFAULT '',        -- 会場名。回答画面の地図ボタンに使う
   address    TEXT NOT NULL DEFAULT '',        -- 会場の住所。あればこちらで地図を引く
+  -- 主催者がその回だけ伝えたいこと。要項に書いていない連絡事項の置き場
+  -- （「駐車場は南側」「ゼッケンを忘れずに」）。参加者の一言（notes）の逆方向
+  memo       TEXT NOT NULL DEFAULT '',
   closed     INTEGER NOT NULL DEFAULT 0,      -- 手じまい。締切の判定とは別
   created_at INTEGER NOT NULL,
   PRIMARY KEY (org_id, id)
