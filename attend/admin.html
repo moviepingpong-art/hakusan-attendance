@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260831">
+<link rel="stylesheet" href="attend.css?v=20260832">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -137,7 +137,7 @@
          **日本語版のドロッパーで作った出欠は日本語**、という当たり前を機械が決める。
          ドロッパーが `#l=` で渡してくる（attendance-hook.js の adminUrl）。
          ここを通らずに直接つくった人には、主催者が見ている画面のことばを当てる。
-         間違っていたときは「団体名とメンバー」で直せる（newOrgLang_ と edLang）。 -->
+         決め方は newOrgLang_。**画面に選択欄はもう無い**（2026-08-25 に両方消した）。 -->
 
     <div class="field">
       <label data-i18n="adMembers">メンバー</label>
@@ -215,42 +215,17 @@
       <div id="evList"></div>
     </section>
 
-    <!-- 自分用の管理リンク。ふだんは伏せておく（肩ごしに見られる場所で開くこともある） -->
-    <section class="step">
-      <h2 data-i18n="adMyTitle">あなたの管理リンク</h2>
-      <p class="hint" id="myHint"></p>
-      <button class="btn sub wide" id="myShow" type="button">管理リンクを表示する</button>
-      <div id="myBox" hidden style="margin-top:12px;">
-        <div class="urlbox">
-          <div class="t" data-i18n="adMyBoxT">あなただけのもの</div>
-          <div class="u"><input id="myUrl" type="text" readonly><button class="btn" data-copy="myUrl" type="button" data-i18n="adCopy">コピー</button></div>
-        </div>
-        <p class="hint" data-i18n="adMyNote"></p>
-      </div>
-    </section>
+    <!-- 「あなたの管理リンク」と「みなさんに配るURL」の2節は 2026-08-25 に消した。
+         LINE公式アカウントの運用をやめ、**配るのはドロッパーの案内文（LINEタブ）から**に
+         一本化したため。管理リンクは「できあがりました」の画面で1回だけ見せる。
 
-    <!-- 配るURL。ふだんは伏せておく（管理リンクと同じ作り）。
-         2026-08-25 に LINE公式アカウントの運用をやめてから、配るのは
-         **ドロッパーの案内文（LINEタブ）から**が主な道になった。ここを開くのは
-         「あとから入った人に送りたい」「案内文を作り直さずURLだけ欲しい」ときだけ。
+         ★ 消えたのは**画面だけ**。値はどちらも load() が持っている。
+           - 管理リンク … `adminKey`（記憶とURLのハッシュから）
+           - 配るURL   … `listUrl_`（tellDropper が案内文へ渡すのに使う。**消さないこと**）
+           i18n の adMy* / adUrl* も残してある。戻すときはここに節を書き直すだけでよい。
 
-         ★ 消さずに残してある。案内文にURLが入るのは**LINEタブだけ**で、
-           しかも**その場で出欠を作ったときだけ**。管理画面から団体を直接つくった人と、
-           あとで必要になった人は、ここ以外に入手先が無い。
-
-         2026-08-25：3本 → 1本。この1本にタブが付いていて、出欠入力・わたしの回答・
-         出欠確認のすべてに行ける。my.html / status.html は転送ページとして残してある -->
-    <section class="step">
-      <h2 data-i18n="adUrlTitle">みなさんに配るURL</h2>
-      <button class="btn sub wide" id="urlShow" type="button">配るURLを表示する</button>
-      <div id="urlBox" hidden style="margin-top:12px;">
-        <div class="urlbox">
-          <div class="t" data-i18n="adUrl1">出欠のページ</div>
-          <div class="u"><input id="u1" type="text" readonly><button class="btn" data-copy="u1" type="button" data-i18n="adCopy">コピー</button></div>
-        </div>
-        <p class="hint" data-i18n="adUrlHint"></p>
-      </div>
-    </section>
+         ★ 承知のうえの割り切り：**管理リンクを見られるのは作成直後の1回だけ**になった。
+           機種を替えるときは、ブックマークかご自身あてのメッセージが頼りになる。 -->
 
     <!-- 団体名と名簿 -->
     <section class="step">
@@ -260,16 +235,14 @@
         <input id="edOrg" type="text" autocomplete="off">
       </div>
       <div class="field">
-        <!-- ★ こちらは残す。つくるときは機械が決めるが、**間違ったときの直し場所が要る。**
-             ことばが違うと参加者は画面を読めず、団体を作り直すしかなくなる（回答も名簿も消える）。 -->
-        <label for="edLang" data-i18n="adOrgLang">参加者に見せることば</label>
-        <select id="edLang">
-          <option value="ja">日本語</option>
-          <option value="en">English</option>
-          <option value="in">Hinglish</option>
-        </select>
-        <p class="hint" data-i18n="adOrgLangHint"></p>
-      </div>
+        <!-- 「参加者に見せることば」の欄は 2026-08-25 に消した。
+             **使ったドロッパーのことばで決まる**ようになったので、主催者は選ばない
+             （日本語版で作った出欠は日本語）。attendance-hook.js の adminUrl が `&l=` を載せる。
+
+             ★ saveOrg に lang を送らないこと。送らなければサーバーは今の値を保つ
+               （`b.lang == null ? org.row.lang : b.lang`）。空文字を送ると ja に落ちる。
+             ★ ことばが違っていたときの直し場所が、これで画面から無くなった。
+               直すには saveOrg を直に叩くか、この欄を書き戻すことになる。 -->
       <!-- 回答者の名前を参加者にも見せるか。**この画面（主催者）には効かない**——
            伏せていても下の「出欠の集まり具合」には名前が出る。メンバー選定に要るため。
            団体をつくる画面には置いていない（準備は団体名と名簿だけ、を崩さない）。
@@ -306,8 +279,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260831"></script>
-<script src="admin-i18n.js?v=20260831"></script>
+<script src="attend.js?v=20260832"></script>
+<script src="admin-i18n.js?v=20260832"></script>
 <script>
 (function () {
   'use strict';
@@ -339,10 +312,7 @@
   function repaint() {
     $('keyWarn').innerHTML = '<b>' + esc(T('adKeyWarn1')) + '</b><br>'
       + esc(T('adKeyWarn2')) + '<b>' + esc(T('adKeyWarn3')) + '</b><br>' + esc(T('adKeyWarn4'));
-    $('myHint').innerHTML = T('adMyHint');
     $('delLead').innerHTML = T('adDelLead');
-    $('myShow').textContent = T($('myBox').hidden ? 'adMyShow' : 'adMyHide');
-    $('urlShow').textContent = T($('urlBox').hidden ? 'adUrlShow' : 'adUrlHide');
     $('tkPasteBtn').textContent = T($('tkPaste').hidden ? 'adPasteOpen' : 'adPasteClose');
     $('tkManualBtn').textContent = T($('tkManual').hidden ? 'adManualOpen' : 'adManualClose');
     if (!$('home').hidden) { paintConn(); loadTaikai(); loadEvents(); }
@@ -594,15 +564,17 @@
   $('edAdd').setAttribute('data-add', '1');
   $('edAdd').addEventListener('click', function () { memberRow($edRows, null).querySelector('.mname').focus(); });
 
+  /* 参加者に配るURL。**画面には出さないが、値は要る。**
+     出欠を作ったあと、ドロッパーへ渡して案内文に載せてもらう（tellDropper）。
+     消すと、LINEに貼る案内文からURLが落ちる。 */
+  var listUrl_ = '';
+
   function load() {
     withKey({ action: 'org' }).then(function (d) {
       $('org').textContent = d.org.name;
       $('edOrg').value = d.org.name;
-      $('edLang').value = d.org.lang || 'ja';
       $('edShowNames').checked = !!d.org.showNames;
-      // 合鍵はこの端末にしか無い。サーバーは SHA-256 しか持っていないので、組み立てはここで
-      $('myUrl').value = d.urls.admin || (d.urls.list.replace(/\/\?s=/, '/admin.html?s=') + '#k=' + encodeURIComponent(adminKey));
-      $('u1').value = d.urls.list;
+      listUrl_ = d.urls.list || '';
 
       $edRows.innerHTML = '';
       (d.members || []).forEach(function (m) { memberRow($edRows, m); });
@@ -723,8 +695,8 @@
      （リッチメニューが無いので、書かないと参加者はどこからも辿り着けない）。
      団体につき1本で行事が増えても変わらないので、渡すのはこれだけでよい。 */
   function tellDropper(name, date) {
-    // 出欠を入力するURL（配る3本の1本目）。load() が入れているので、そこから取る
-    var url = $('u1').value || '';
+    // 出欠を入力するURL。画面には出していないので、load() が控えた値から取る
+    var url = listUrl_ || '';
     var note = { name: name, date: date, url: url, at: Date.now() };
     store('dropperAttendDone', JSON.stringify(note));
     var o = opener();
@@ -776,17 +748,6 @@
     $('connGo').textContent = T(on ? 'adConnForget' : 'adConnRemember');
   }
 
-  $('myShow').addEventListener('click', function () {
-    var on = $('myBox').hidden;
-    show($('myBox'), on);
-    this.textContent = T(on ? 'adMyHide' : 'adMyShow');
-  });
-
-  $('urlShow').addEventListener('click', function () {
-    var on = $('urlBox').hidden;
-    show($('urlBox'), on);
-    this.textContent = T(on ? 'adUrlHide' : 'adUrlShow');
-  });
 
   $('connGo').addEventListener('click', function () {
     var on = pick(REM) && pick(REM) === adminKey;
@@ -1061,7 +1022,8 @@
 
     this.disabled = true;
     say($('edMsg'), T('adSaving'));
-    withKey({ action: 'saveOrg', name: name, lang: $('edLang').value, showNames: $('edShowNames').checked })
+    // lang は送らない。送らなければサーバーが今の値を保つ（空文字を送ると ja に落ちる）
+    withKey({ action: 'saveOrg', name: name, showNames: $('edShowNames').checked })
       .then(function () { return withKey({ action: 'saveMembers', members: members }); })
       .then(function () {
         $('edSave').disabled = false;
