@@ -50,7 +50,7 @@ ATTEND.addDict({
     adOrgName: '団体名',
     adOrgNamePh: '例：白山ラージボール卓球クラブ',
     adOrgLang: '参加者に見せることば',
-    adOrgLangHint: '回答・わたしの回答・集まり具合の3画面がこのことばになります。配るURLは3本のままで、参加者は何も選びません。あとから変えられます。',
+    adOrgLangHint: 'ふだんは、使ったドロッパーのことばが自動で入ります（日本語版で作った出欠は日本語）。参加者の3画面がこのことばになり、参加者は何も選びません。違っていたらここで直してください。',
     // ★ この設定は**参加者どうしの見え方**だけを変える。主催者のこの画面には効かない
     adShowNames: '回答した人の名前',
     adShowNamesOn: '参加者どうしでも、誰が〇・△・×かを名前で見せる',
@@ -134,6 +134,7 @@ ATTEND.addDict({
 
     /* 配るURL */
     adUrlTitle: 'みなさんに配るURL',
+    adUrlShow: '配るURLを表示する', adUrlHide: '配るURLを隠す',
     adUrl1: '出欠のページ',
     adUrlHint: 'このURLはずっと変わりません。行事が増えても貼り直しは要りません。下のタブで「出欠入力」「わたしの回答」「出欠確認」に行けるので、配るのはこの1本だけです。',
 
@@ -213,7 +214,7 @@ ATTEND.addDict({
     adOrgName: 'Group name',
     adOrgNamePh: 'e.g. Riverside Table Tennis Club',
     adOrgLang: 'Language shown to members',
-    adOrgLangHint: 'The three member screens (answer, my answers, counts) use this language. The links you hand out stay the same, and members choose nothing. You can change this later.',
+    adOrgLangHint: 'This is normally set for you from the dropper you used. It is the language of the three member screens; members choose nothing. Change it here if it is wrong.',
     adShowNames: 'Names of those who answered',
     adShowNamesOn: 'Let members see who answered yes, maybe or no, by name',
     adShowNamesHint: 'Leave this off and the Counts screen shows members only the number of men and women. Either way, this admin page always shows the names and notes — you need them to pick a team. Names of those who have not answered are never shown to members. You can change this later.',
@@ -291,6 +292,7 @@ ATTEND.addDict({
     adMyNote: 'When you change phones, or use the app on your Home Screen, copy this and paste it into “Already have a group?”.',
 
     adUrlTitle: 'Links to hand out',
+    adUrlShow: 'Show the URL', adUrlHide: 'Hide the URL',
     adUrl1: 'Attendance page',
     adUrlHint: 'This link never changes, so you never have to replace it as events come and go. The tabs at the bottom lead to Answer, My answers and Counts — this one link is all you hand out.',
 
@@ -366,7 +368,7 @@ ATTEND.addDict({
     adOrgName: 'Group ka naam',
     adOrgNamePh: 'jaise Riverside Table Tennis Club',
     adOrgLang: 'Members ko dikhne wali bhasha',
-    adOrgLangHint: 'Teen member screen (jawab, mere jawab, ginti) isi bhasha mein honge. Bante hue link wahi rahenge, members ko kuch nahi chunna. Baad mein badal sakte hain.',
+    adOrgLangHint: 'Yeh aam taur par us dropper se apne aap aa jata hai jo aapne use kiya. Teen member screen isi bhasha mein honge; members ko kuch nahi chunna. Galat ho to yahan badal lein.',
     adShowNames: 'Jinhone jawab diya, unke naam',
     adShowNamesOn: 'Members ko bhi dikhayein ki kaun 〇, △ ya × hai — naam ke saath',
     adShowNamesHint: 'Band rakhne par Ginti screen par members ko sirf mard-aurat ki ginti dikhegi. Dono halat mein is admin page par naam aur baat waise hi dikhte hain (team chunne ke liye zaroori hai). Jinhone jawab nahi diya, unke naam members ko kabhi nahi dikhte. Baad mein badal sakte hain.',
@@ -444,6 +446,7 @@ ATTEND.addDict({
     adMyNote: 'Phone badalne par, ya Home Screen wale app mein, ise copy karke “Pehle se group hai?” mein paste karein.',
 
     adUrlTitle: 'Baantne wale link',
+    adUrlShow: 'Link dikhayein', adUrlHide: 'Link chhupayein',
     adUrl1: 'Attendance page',
     adUrlHint: 'Yeh link kabhi nahi badalta, event badalne par bhi nahi. Neeche ke tabs se Jawab, Mere jawab aur Ginti — teeno par ja sakte hain. Sirf yahi ek link baantna hai.',
 

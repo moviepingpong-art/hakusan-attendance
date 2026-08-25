@@ -133,15 +133,11 @@
       <input id="newOrg" type="text" data-i18n-ph="adOrgNamePh" placeholder="例：白山ラージボール卓球クラブ" autocomplete="off">
     </div>
 
-    <div class="field">
-      <label for="newLang" data-i18n="adOrgLang">参加者に見せることば</label>
-      <select id="newLang">
-        <option value="ja">日本語</option>
-        <option value="en">English</option>
-        <option value="in">Hinglish</option>
-      </select>
-      <p class="hint" data-i18n="adOrgLangHint"></p>
-    </div>
+    <!-- 参加者に見せることばの選択欄は 2026-08-25 にやめた。
+         **日本語版のドロッパーで作った出欠は日本語**、という当たり前を機械が決める。
+         ドロッパーが `#l=` で渡してくる（attendance-hook.js の adminUrl）。
+         ここを通らずに直接つくった人には、主催者が見ている画面のことばを当てる。
+         間違っていたときは「団体名とメンバー」で直せる（newOrgLang_ と edLang）。 -->
 
     <div class="field">
       <label data-i18n="adMembers">メンバー</label>
@@ -233,16 +229,27 @@
       </div>
     </section>
 
-    <!-- 配るURL -->
+    <!-- 配るURL。ふだんは伏せておく（管理リンクと同じ作り）。
+         2026-08-25 に LINE公式アカウントの運用をやめてから、配るのは
+         **ドロッパーの案内文（LINEタブ）から**が主な道になった。ここを開くのは
+         「あとから入った人に送りたい」「案内文を作り直さずURLだけ欲しい」ときだけ。
+
+         ★ 消さずに残してある。案内文にURLが入るのは**LINEタブだけ**で、
+           しかも**その場で出欠を作ったときだけ**。管理画面から団体を直接つくった人と、
+           あとで必要になった人は、ここ以外に入手先が無い。
+
+         2026-08-25：3本 → 1本。この1本にタブが付いていて、出欠入力・わたしの回答・
+         出欠確認のすべてに行ける。my.html / status.html は転送ページとして残してある -->
     <section class="step">
       <h2 data-i18n="adUrlTitle">みなさんに配るURL</h2>
-      <!-- 2026-08-25：3本 → 1本。この1本にタブが付いていて、出欠入力・わたしの回答・
-           出欠確認のすべてに行ける。my.html / status.html は転送ページとして残してある -->
-      <div class="urlbox">
-        <div class="t" data-i18n="adUrl1">出欠のページ</div>
-        <div class="u"><input id="u1" type="text" readonly><button class="btn" data-copy="u1" type="button" data-i18n="adCopy">コピー</button></div>
+      <button class="btn sub wide" id="urlShow" type="button">配るURLを表示する</button>
+      <div id="urlBox" hidden style="margin-top:12px;">
+        <div class="urlbox">
+          <div class="t" data-i18n="adUrl1">出欠のページ</div>
+          <div class="u"><input id="u1" type="text" readonly><button class="btn" data-copy="u1" type="button" data-i18n="adCopy">コピー</button></div>
+        </div>
+        <p class="hint" data-i18n="adUrlHint"></p>
       </div>
-      <p class="hint" data-i18n="adUrlHint"></p>
     </section>
 
     <!-- 団体名と名簿 -->
@@ -253,12 +260,15 @@
         <input id="edOrg" type="text" autocomplete="off">
       </div>
       <div class="field">
+        <!-- ★ こちらは残す。つくるときは機械が決めるが、**間違ったときの直し場所が要る。**
+             ことばが違うと参加者は画面を読めず、団体を作り直すしかなくなる（回答も名簿も消える）。 -->
         <label for="edLang" data-i18n="adOrgLang">参加者に見せることば</label>
         <select id="edLang">
           <option value="ja">日本語</option>
           <option value="en">English</option>
           <option value="in">Hinglish</option>
         </select>
+        <p class="hint" data-i18n="adOrgLangHint"></p>
       </div>
       <!-- 回答者の名前を参加者にも見せるか。**この画面（主催者）には効かない**——
            伏せていても下の「出欠の集まり具合」には名前が出る。メンバー選定に要るため。
@@ -332,6 +342,7 @@
     $('myHint').innerHTML = T('adMyHint');
     $('delLead').innerHTML = T('adDelLead');
     $('myShow').textContent = T($('myBox').hidden ? 'adMyShow' : 'adMyHide');
+    $('urlShow').textContent = T($('urlBox').hidden ? 'adUrlShow' : 'adUrlHide');
     $('tkPasteBtn').textContent = T($('tkPaste').hidden ? 'adPasteOpen' : 'adPasteClose');
     $('tkManualBtn').textContent = T($('tkManual').hidden ? 'adManualOpen' : 'adManualClose');
     if (!$('home').hidden) { paintConn(); loadTaikai(); loadEvents(); }
@@ -362,12 +373,20 @@
   var adminKey = '';
   var keyFromUrl = false;
   var inToken = '';
+  var inLang = '';        // ドロッパーのことば（#l=）。団体をつくるときの言語になる
   (function readHash() {
     var h = (location.hash || '').replace(/^#/, '');
     var mk = h.match(/(?:^|&)k=([^&]+)/);
     if (mk) { adminKey = decodeURIComponent(mk[1]); keyFromUrl = true; }
     var mt = h.match(/(?:^|&)t=([^&]+)/);
     if (mt) inToken = decodeURIComponent(mt[1]);
+    /* #l= はドロッパーのことば。**日本語版で作った出欠は日本語**にするため。
+       知らない値は捨てる（画面が壊れるより、既定に落ちるほうがよい）。 */
+    var ml = h.match(/(?:^|&)l=([^&]+)/);
+    if (ml) {
+      var v = decodeURIComponent(ml[1]).toLowerCase();
+      if (v === 'ja' || v === 'en' || v === 'in') inLang = v;
+    }
 
     var q = new URLSearchParams(location.search);
     if (!adminKey && q.get('k')) {
@@ -389,18 +408,36 @@
         + (keyFromUrl ? '#k=' + encodeURIComponent(adminKey) : '');
       try { history.replaceState(null, '', back); } catch (e) { /* noop */ }
     }
+
+    /* 預かってあるぶんから、ことばだけ先に拾う。**取り出さずに覗くだけ。**
+       団体をつくるのは、行事を取り込むより**先**（takePending が呼ばれる前）なので、
+       ここで拾っておかないと、画面を読み直した人の団体が既定のことばになる。 */
+    if (!inLang) {
+      try {
+        var p = JSON.parse(pick(PEND) || 'null');
+        if (p && p.l && Date.now() - (p.at || 0) < PEND_MS) inLang = p.l;
+      } catch (e) { /* 壊れていたら何もしない */ }
+    }
   })();
 
   /* 合鍵が無いまま届いた行事は、しばらく預かる。
      主催者が管理リンクを開き直したときに、貼り付けずに済むように。 */
-  function keepPending(token) { store(PEND, JSON.stringify({ t: token, at: Date.now() })); }
+  /* ★ ことば（l）も一緒に預かる。団体をつくるのは、これを預けたあと——
+     画面を読み直したあとになることもある。ここに残しておかないと、
+     英語版のドロッパーから来た人の団体が日本語になる。 */
+  function keepPending(token) {
+    store(PEND, JSON.stringify({ t: token, l: inLang, at: Date.now() }));
+  }
   function takePending() {
     var raw = pick(PEND);
     if (!raw) return '';
     store(PEND, null);
     try {
       var o = JSON.parse(raw);
-      if (o && o.t && Date.now() - (o.at || 0) < PEND_MS) return o.t;
+      if (o && o.t && Date.now() - (o.at || 0) < PEND_MS) {
+        if (!inLang && o.l) inLang = o.l;   // URLから来ていなければ、預かったぶんを使う
+        return o.t;
+      }
     } catch (e) { /* 壊れていたら捨てるだけ */ }
     return '';
   }
@@ -506,6 +543,12 @@
   for (var i = 0; i < 4; i++) memberRow($newRows, null);
   $('newAdd').addEventListener('click', function () { memberRow($newRows, null).querySelector('.mname').focus(); });
 
+  /* つくる団体の、参加者に見せることば。**主催者に選ばせない。**
+     ドロッパーから来たならそのことば（`#l=`）。日本語版で作った出欠は日本語になる。
+     管理画面から直接つくったときは、主催者がいま見ている画面のことばに合わせる
+     （英語で操作している人が、黙って日本語の団体を作ってしまうのを防ぐ）。 */
+  function newOrgLang_() { return inLang || ATTEND.lang(); }
+
   $('newGo').addEventListener('click', function () {
     var name = $('newOrg').value.trim();
     if (!name) { say($('newMsg'), T('adNeedOrgName'), 'ng'); $('newOrg').focus(); return; }
@@ -514,7 +557,7 @@
 
     this.disabled = true;
     say($('newMsg'), T('adCreating'));
-    api({ action: 'createOrg', name: name, lang: $('newLang').value, members: members }).then(function (d) {
+    api({ action: 'createOrg', name: name, lang: newOrgLang_(), members: members }).then(function (d) {
       adminKey = d.adminKey;
       $('keyUrl').value = d.urls.admin;
       showStart(false);
@@ -737,6 +780,12 @@
     var on = $('myBox').hidden;
     show($('myBox'), on);
     this.textContent = T(on ? 'adMyHide' : 'adMyShow');
+  });
+
+  $('urlShow').addEventListener('click', function () {
+    var on = $('urlBox').hidden;
+    show($('urlBox'), on);
+    this.textContent = T(on ? 'adUrlHide' : 'adUrlShow');
   });
 
   $('connGo').addEventListener('click', function () {

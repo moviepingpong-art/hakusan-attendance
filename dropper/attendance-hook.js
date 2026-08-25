@@ -78,7 +78,14 @@ var AttendanceHook = (function () {
     if (!token) return '';
     var base = (typeof window !== 'undefined' && window.ATTEND_ADMIN_URL)
       || 'https://app.dropper-tools.com/attend/admin.html';
-    return base + '#t=' + token;
+    /* ★ ドロッパーのことばを一緒に渡す（`&l=`）。
+       出欠システムは1本しか無く、参加者に見せることばは**団体ごと**に持っている。
+       これが無いと、英語版のドロッパーから作った団体も日本語の画面になってしまう。
+       以前は管理画面で主催者に選ばせていたが、**日本語版で作った出欠は日本語**という
+       当たり前を機械が決めればよいので、2026-08-25 に選択欄をやめてこちらに移した。
+       受け取るのは attend/admin.html の readHash。知らない値は向こうで捨てられる。 */
+    var lang = (typeof window !== 'undefined' && window.LANG) ? String(window.LANG) : '';
+    return base + '#t=' + token + (lang ? '&l=' + encodeURIComponent(lang) : '');
   }
 
   return {
