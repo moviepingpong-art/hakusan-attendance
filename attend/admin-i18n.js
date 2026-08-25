@@ -130,6 +130,10 @@ ATTEND.addDict({
     adMyHint: 'この画面をもう一度開くためのリンクです。<b>人に渡さないでください。</b>渡すと名簿も回答も操作されます。',
     adMyShow: '管理リンクを表示する', adMyHide: '管理リンクを隠す',
     adMyBoxT: 'あなただけのもの',
+    /* ★ ブックマークへの登録は自動化できない（どのブラウザにもAPIが無い）ので、文面でお願いする。
+       ★ 「アドレス欄をブックマーク」と書かないこと。端末に覚えさせて開いたときは
+         `#k=` を書き戻していないので、合鍵の無いURLが保存されてしまう。 */
+    adMyBookmark: '<b>ブックマーク（お気に入り）に登録してください。</b>上の「コピー」を押してから、ブックマークの<b>URL欄に貼り付けて</b>登録します。<br>※ アドレス欄をそのままブックマークすると、合鍵が入らないことがあります。必ず上のリンクをお使いください。',
     adMyNote: '機種を替えたときや、ホーム画面のアプリで使うときは、これをコピーして「すでに団体をお持ちの方」に貼り付けてください。',
 
     /* 配るURL */
@@ -289,6 +293,7 @@ ATTEND.addDict({
     adMyHint: 'The link that opens this screen again. <b>Do not pass it on.</b> Anyone who has it can change the roster and the answers.',
     adMyShow: 'Show the admin link', adMyHide: 'Hide the admin link',
     adMyBoxT: 'Yours alone',
+    adMyBookmark: '<b>Please save this as a bookmark.</b> Press Copy above, then paste it into the <b>URL field</b> of a new bookmark.<br>Bookmarking the address bar as it appears may leave out your key — always use the link above.',
     adMyNote: 'When you change phones, or use the app on your Home Screen, copy this and paste it into “Already have a group?”.',
 
     adUrlTitle: 'Links to hand out',
@@ -443,6 +448,7 @@ ATTEND.addDict({
     adMyHint: 'Yeh link is screen ko dobara kholta hai. <b>Kisi ko na dein.</b> Jiske paas hoga woh roster aur jawab badal sakta hai.',
     adMyShow: 'Admin link dikhayein', adMyHide: 'Admin link chhupayein',
     adMyBoxT: 'Sirf aapka',
+    adMyBookmark: '<b>Ise bookmark mein save kar lijiye.</b> Upar Copy dabayein, phir naye bookmark ke <b>URL field</b> mein paste karein.<br>Address bar ko waise hi bookmark karne par key chhut sakti hai — hamesha upar wala link use karein.',
     adMyNote: 'Phone badalne par, ya Home Screen wale app mein, ise copy karke “Pehle se group hai?” mein paste karein.',
 
     adUrlTitle: 'Baantne wale link',
