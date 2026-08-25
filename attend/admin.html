@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260833">
+<link rel="stylesheet" href="attend.css?v=20260834">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -293,8 +293,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260833"></script>
-<script src="admin-i18n.js?v=20260833"></script>
+<script src="attend.js?v=20260834"></script>
+<script src="admin-i18n.js?v=20260834"></script>
 <script>
 (function () {
   'use strict';
@@ -544,6 +544,14 @@
     api({ action: 'createOrg', name: name, lang: newOrgLang_(), members: members }).then(function (d) {
       adminKey = d.adminKey;
       $('keyUrl').value = d.urls.admin;
+      /* ★ つくった直後に、この端末へ覚えさせる。**押させない。**
+         合鍵はサーバーに SHA-256 しか無く、生の値が出るのはこの応答の1回だけ。
+         2026-08-25 に「あなたの管理リンク」の節を消したので、ここで覚えなければ
+         合鍵はこのタブのURL（`#k=`）にしか残らず、閉じた時点で永久に失われる。
+         いま目の前でつくった端末なので、本人のものと見てよい。
+         共用端末の人には「この端末から消す」がそのまま逃げ道になる。
+         覚えられれば、次にドロッパーへログインした時点で appdata にも預けられる。 */
+      store(REM, adminKey);
       showStart(false);
       show($('keyScreen'), true);
       window.scrollTo(0, 0);
