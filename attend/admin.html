@@ -32,6 +32,10 @@
   textarea{width:100%; min-height:96px; padding:12px; font-size:14px; border:2px solid var(--line);
            border-radius:10px; font-family:inherit; resize:vertical;}
   .pend{font-size:13.5px; color:var(--sub); margin:8px 0 0; word-break:break-word;}
+  /* 「ブックマークに登録してください」。**なくすと復旧できない**ものの案内なので、
+     ふつうの hint より目立たせる（読み飛ばされると取り返しがつかない）。 */
+  .hint.keep{background:var(--sankaku-bg); border:1px solid var(--sankaku);
+             border-radius:10px; padding:10px 12px; color:#6b4e07; margin:10px 0 0;}
   /* 未回答者は「名前を出す」だけでは足りない。グループLINEへ貼れるようにコピーを添える
      （こちらから催促を送る手段は持っていないので、貼るところまでを主催者に渡す） */
   .pend-copy{margin:6px 0 0; font-size:12.5px; padding:5px 12px; width:auto;}
@@ -215,17 +219,36 @@
       <div id="evList"></div>
     </section>
 
-    <!-- 「あなたの管理リンク」と「みなさんに配るURL」の2節は 2026-08-25 に消した。
+    <!-- 自分用の管理リンク。ふだんは伏せておく（肩ごしに見られる場所で開くこともある）。
+
+         ★ ブックマークへの登録は**自動化できない**。ページから勝手にブックマークを
+           増やすAPIは、どのブラウザにも無い（Firefox の addPanel も IE の AddFavorite も
+           廃止済み。悪用を防ぐため意図的に塞がれている）。だから**文面でお願いする**。
+
+         ★ **「アドレス欄をブックマーク」では駄目な場合がある。**
+           端末に覚えさせて開いたときは `#k=` をアドレス欄に書き戻していないので、
+           そのままブックマークすると**合鍵の無いURL**が保存される。
+           必ず下のリンクをコピーして登録してもらう。adMyBookmark にそう書いてある。 -->
+    <section class="step">
+      <h2 data-i18n="adMyTitle">あなたの管理リンク</h2>
+      <p class="hint" id="myHint"></p>
+      <button class="btn sub wide" id="myShow" type="button">管理リンクを表示する</button>
+      <div id="myBox" hidden style="margin-top:12px;">
+        <div class="urlbox">
+          <div class="t" data-i18n="adMyBoxT">あなただけのもの</div>
+          <div class="u"><input id="myUrl" type="text" readonly><button class="btn" data-copy="myUrl" type="button" data-i18n="adCopy">コピー</button></div>
+        </div>
+        <p class="hint keep" id="myBookmark"></p>
+        <p class="hint" data-i18n="adMyNote"></p>
+      </div>
+    </section>
+
+    <!-- 「みなさんに配るURL」の節は 2026-08-25 に消した。
          LINE公式アカウントの運用をやめ、**配るのはドロッパーの案内文（LINEタブ）から**に
-         一本化したため。管理リンクは「できあがりました」の画面で1回だけ見せる。
-
-         ★ 消えたのは**画面だけ**。値はどちらも load() が持っている。
-           - 管理リンク … `adminKey`（記憶とURLのハッシュから）
-           - 配るURL   … `listUrl_`（tellDropper が案内文へ渡すのに使う。**消さないこと**）
-           i18n の adMy* / adUrl* も残してある。戻すときはここに節を書き直すだけでよい。
-
-         ★ 承知のうえの割り切り：**管理リンクを見られるのは作成直後の1回だけ**になった。
-           機種を替えるときは、ブックマークかご自身あてのメッセージが頼りになる。 -->
+         一本化したため。
+         ★ 消えたのは画面だけ。値は `listUrl_` が持っている
+           （tellDropper が案内文へ渡すのに使う。**消さないこと**）。
+           i18n の adUrl* も残してある。戻すときはここに節を書き直すだけでよい。 -->
 
     <!-- 団体名と名簿 -->
     <section class="step">
@@ -312,7 +335,10 @@
   function repaint() {
     $('keyWarn').innerHTML = '<b>' + esc(T('adKeyWarn1')) + '</b><br>'
       + esc(T('adKeyWarn2')) + '<b>' + esc(T('adKeyWarn3')) + '</b><br>' + esc(T('adKeyWarn4'));
+    $('myHint').innerHTML = T('adMyHint');
+    $('myBookmark').innerHTML = T('adMyBookmark');
     $('delLead').innerHTML = T('adDelLead');
+    $('myShow').textContent = T($('myBox').hidden ? 'adMyShow' : 'adMyHide');
     $('tkPasteBtn').textContent = T($('tkPaste').hidden ? 'adPasteOpen' : 'adPasteClose');
     $('tkManualBtn').textContent = T($('tkManual').hidden ? 'adManualOpen' : 'adManualClose');
     if (!$('home').hidden) { paintConn(); loadTaikai(); loadEvents(); }
@@ -574,6 +600,8 @@
       $('org').textContent = d.org.name;
       $('edOrg').value = d.org.name;
       $('edShowNames').checked = !!d.org.showNames;
+      // 合鍵はこの端末にしか無い。サーバーは SHA-256 しか持っていないので、組み立てはここで
+      $('myUrl').value = d.urls.admin || (d.urls.list.replace(/\/\?s=/, '/admin.html?s=') + '#k=' + encodeURIComponent(adminKey));
       listUrl_ = d.urls.list || '';
 
       $edRows.innerHTML = '';
@@ -747,6 +775,12 @@
       : (T('adConnOff') + (pasteTry ? T('adConnPaste') : ''));
     $('connGo').textContent = T(on ? 'adConnForget' : 'adConnRemember');
   }
+
+  $('myShow').addEventListener('click', function () {
+    var on = $('myBox').hidden;
+    show($('myBox'), on);
+    this.textContent = T(on ? 'adMyHide' : 'adMyShow');
+  });
 
 
   $('connGo').addEventListener('click', function () {
