@@ -133,9 +133,10 @@ async function listEvents(env, orgId, deviceId) {
 
   const me = await linkOf(env, org.id, deviceId);
   const mine = me ? await latestOfName(env, org.id, me.name) : {};
+  const myNotes = me ? await notesOfName(env, org.id, me.name) : {};
   const events = (await eventsOf(env, org.id, org.lang))
     .filter(ev => !ev.closed)
-    .map(ev => publicEvent(ev, mine[ev.id] || null));
+    .map(ev => publicEvent(ev, mine[ev.id] || null, myNotes[ev.id]));
 
   return { ok: true, org: org.name, lang: normLang(org.lang), member: me, events };
 }
@@ -151,8 +152,12 @@ async function getEvent(env, orgId, eventId, deviceId) {
 
   const me = await linkOf(env, org.id, deviceId);
   const mine = me ? ((await latestOfName(env, org.id, me.name))[ev.id] || null) : null;
+  const myNote = me ? (await notesOfName(env, org.id, me.name))[ev.id] : '';
 
-  return { ok: true, org: org.name, lang: normLang(org.lang), member: me, event: publicEvent(ev, mine) };
+  return {
+    ok: true, org: org.name, lang: normLang(org.lang), member: me,
+    event: publicEvent(ev, mine, myNote)
+  };
 }
 
 /** 端末IDから登録ずみの本人を返す */
@@ -164,8 +169,12 @@ async function whoami(env, orgId, deviceId) {
   return { ok: true, org: org.name, lang: normLang(org.lang), registered: !!me, member: me };
 }
 
-/** e があればその1件、なければ全イベントの集計。**人数のみで個人名は出さない**
- *  （未回答者の名前を出してよいのは主催者向けの画面だけ） */
+/** e があればその1件、なければ全イベントの集計。
+ *
+ *  回答者の名前とコメントは、団体が `show_names = 1` を選んだときだけ出す（既定は伏せる）。
+ *  **未回答者の名前は、設定に関わらずここには決して入れない。**
+ *  「誰が来るか」を見せるのと「誰がまだ答えていないか」を晒すのは別の話で、
+ *  後者を出してよいのは主催者向けの `adminEvents` と `tally` だけ。 */
 async function summaryAction(env, orgId, eventId) {
   const org = await findOrg(env, orgId);
   if (!org) return notFoundOrg();
@@ -180,13 +189,23 @@ async function summaryAction(env, orgId, eventId) {
     evs = (await eventsOf(env, org.id, org.lang)).slice().reverse().slice(0, 50);
   }
 
+  const showNames = isOn(org.show_names);
   const genders = await genderMap(env, org.id);
   const summaries = [];
   for (const ev of evs) {
-    summaries.push(summaryOf(ev, await latestOfEvent(env, org.id, ev.id), genders));
+    summaries.push(summaryOf(
+      ev,
+      await latestOfEvent(env, org.id, ev.id),
+      genders,
+      showNames,
+      showNames ? await notesOf(env, org.id, ev.id) : null
+    ));
   }
 
-  return { ok: true, org: org.name, lang: normLang(org.lang), summaries, summary: summaries[0] || null };
+  return {
+    ok: true, org: org.name, lang: normLang(org.lang),
+    showNames, summaries, summary: summaries[0] || null
+  };
 }
 
 /** 締切前の各イベントについて、その端末の最新回答 */
@@ -197,6 +216,8 @@ async function myAnswers(env, orgId, deviceId) {
 
   const me = await linkOf(env, org.id, deviceId);
   const mine = me ? await latestOfName(env, org.id, me.name) : {};
+  // 自分が書いた一言。書き直せるように、そのまま入力欄へ戻す
+  const myNotes = me ? await notesOfName(env, org.id, me.name) : {};
 
   const list = (await eventsOf(env, org.id, org.lang)).filter(ev => !ev.closed).map(ev => {
     const ans = mine[ev.id] || null;
@@ -204,7 +225,8 @@ async function myAnswers(env, orgId, deviceId) {
     const done = items.filter(x => !!x.answer).length;
     return {
       id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText, youkou: ev.youkou,
-      items, answered: done > 0, allAnswered: done > 0 && done === items.length
+      items, note: myNotes[ev.id] || '',
+      answered: done > 0, allAnswered: done > 0 && done === items.length
     };
   });
 
@@ -224,12 +246,33 @@ async function register(env, b) {
   const mem = (await membersOf(env, org.id, false)).find(m => normKey(m.name) === normKey(name));
   if (!mem) return { ok: false, code: 'notInRoster', error: '名簿にないお名前です。主催者にご確認ください。', notInRoster: true };
 
+  /* その名前を、**別の端末がすでに使っているか**。
+     団体のURLを知っていれば名簿の誰の名前でも選べるので、名簿の隣の行を押し間違えると
+     他人の回答を書き換えてしまう。
+
+     ★ 塞がずに知らせるだけにしてある。理由は3つ。
+       - 機種変更・家族での共用があり、名前を選び直せること自体が要る
+       - `links` は追記式で、ここで入れても**他の端末の紐付けは消えない**。
+         何も奪っていないので、押し間違えた人はそのまま選び直せる
+       - 拒否にすると、古い画面（キャッシュ）を使っている人が確認を出せずに詰む。
+         知らせるだけなら、古い画面は今までどおり動く（`taken` を無視するだけ） */
+  // ★ この端末が前にもその名前を使っていたら、警告しない。
+  //   使い慣れた人が選び直すたびに「別の端末が…」と出ると、ただの雑音になる。
+  //   知らせたいのは「**自分のものでない名前**を選ぼうとしている」ときだけ。
+  const mineAlready = await env.DB.prepare(
+    'SELECT 1 AS x FROM links WHERE org_id = ? AND name = ? AND device_id = ? LIMIT 1'
+  ).bind(org.id, mem.name, deviceId).first();
+
+  const other = mineAlready ? null : await env.DB.prepare(
+    'SELECT device_id FROM links WHERE org_id = ? AND name = ? AND device_id <> ? ORDER BY id DESC LIMIT 1'
+  ).bind(org.id, mem.name, deviceId).first();
+
   await env.DB.prepare(
     'INSERT INTO links (org_id, device_id, name, gender, created_at) VALUES (?, ?, ?, ?, ?)'
   ).bind(org.id, deviceId, mem.name, mem.gender, Date.now()).run();
   await touch(env, org.id);
 
-  return { ok: true, member: { name: mem.name, gender: mem.gender } };
+  return { ok: true, member: { name: mem.name, gender: mem.gender }, taken: !!other };
 }
 
 /** 回答。**上書きせず1件ずつ追記する。** 集計は最新行を採用（GAS版と同じ約束） */
@@ -261,13 +304,39 @@ async function answer(env, b) {
   }
   if (!stmts.length) return { ok: false, code: 'noAnswers', error: '回答が選ばれていません。' };
 
+  /* 一言（コメント）。回答と同じく追記式で、空文字も1行として書く
+     （最新行が空＝コメントを消した、という意味になる）。
+     ★ `note` が届いていないときは何も書かない。古い画面から回答されたときに、
+       すでに書いてあるコメントを消してしまわないため。 */
+  const hasNote = Object.prototype.hasOwnProperty.call(b, 'note') && b.note != null;
+  if (hasNote) {
+    stmts.push(env.DB.prepare(
+      'INSERT INTO notes (org_id, event_id, name, text, device_id, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(org.id, ev.id, me.name, cleanNote(b.note), deviceId, now));
+  }
+
   await env.DB.batch(stmts);
   await touch(env, org.id);
 
+  // 返す集計は**参加者に見えるぶん**なので、団体の設定に従う（主催者の画面とは別）
+  const showNames = isOn(org.show_names);
   return {
-    ok: true, saved: clean, member: me,
-    summary: summaryOf(ev, await latestOfEvent(env, org.id, ev.id), await genderMap(env, org.id))
+    ok: true, saved: clean, member: me, showNames,
+    summary: summaryOf(
+      ev,
+      await latestOfEvent(env, org.id, ev.id),
+      await genderMap(env, org.id),
+      showNames,
+      showNames ? await notesOf(env, org.id, ev.id) : null
+    )
   };
+}
+
+/** 一言を整える。改行は1つに詰め、長すぎるものは切る。
+ *  200字は「30分遅れます」「車を2台出せます」を書くのに十分で、
+ *  集計画面に貼られたときに1件で画面を埋めない長さ。 */
+function cleanNote(v) {
+  return String(v == null ? '' : v).replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 200);
 }
 
 
@@ -319,7 +388,10 @@ async function orgHome(env, b) {
 
   return {
     ok: true,
-    org: { id: org.row.id, name: org.row.name, tz: org.row.tz, lang: normLang(org.row.lang) },
+    org: {
+      id: org.row.id, name: org.row.name, tz: org.row.tz, lang: normLang(org.row.lang),
+      showNames: isOn(org.row.show_names)
+    },
     members: await membersOf(env, org.row.id, true),
     urls: urlsFor(org.row.id, String(b.adminKey || ''))
   };
@@ -334,10 +406,12 @@ async function saveOrg(env, b) {
   if (name.length > 60) return bad('orgNameLong', '団体名が長すぎます（60字まで）。');
 
   const lang = normLang(b.lang == null ? org.row.lang : b.lang);
-  await env.DB.prepare('UPDATE orgs SET name = ?, lang = ?, seen_at = ? WHERE id = ?')
-    .bind(name, lang, Date.now(), org.row.id).run();
+  // 届いていない項目は今の値のまま（古い画面から保存されても、設定が勝手に戻らない）
+  const showNames = isOn(b.showNames == null ? org.row.show_names : b.showNames);
+  await env.DB.prepare('UPDATE orgs SET name = ?, lang = ?, show_names = ?, seen_at = ? WHERE id = ?')
+    .bind(name, lang, showNames ? 1 : 0, Date.now(), org.row.id).run();
 
-  return { ok: true, org: name, lang };
+  return { ok: true, org: name, lang, showNames };
 }
 
 /** 名簿はまるごと入れ替える。回答は氏名で持っているので、名前を直しても過去の回答は消えない。 */
@@ -469,15 +543,20 @@ async function adminEvents(env, b) {
   const roster = await membersOf(env, org.row.id, false);
   const list = [];
 
+  // ★ 主催者には**必ず名前を出す**（団体の show_names は参加者向けの設定であって、
+  //    主催者の画面には効かない）。名前が分からないと大会のメンバーを選べない。
   for (const ev of (await eventsOf(env, org.row.id, b.uiLang)).reverse()) {
     const byName = await latestOfEvent(env, org.row.id, ev.id);
-    list.push(Object.assign(summaryOf(ev, byName, genders), {
-      manualClosed: ev.manualClosed,
-      datePassed: ev.datePassed,
-      pending: pendingNames(roster, byName)
-    }));
+    list.push(Object.assign(
+      summaryOf(ev, byName, genders, true, await notesOf(env, org.row.id, ev.id)),
+      {
+        manualClosed: ev.manualClosed,
+        datePassed: ev.datePassed,
+        pending: pendingNames(roster, byName)
+      }
+    ));
   }
-  return { ok: true, events: list };
+  return { ok: true, events: list, showNames: isOn(org.row.show_names) };
 }
 
 /** 1件ぶんの集計。**未回答者の名前が出るのはここだけ。** 参加者向けの応答には決して入れない。 */
@@ -490,12 +569,15 @@ async function tally(env, b) {
 
   const byName = await latestOfEvent(env, org.row.id, ev.id);
   const roster = await membersOf(env, org.row.id, false);
+  const notes = await notesOf(env, org.row.id, ev.id);
+  const summary = summaryOf(ev, byName, await genderMap(env, org.row.id), true, notes);
 
   return {
     ok: true,
-    summary: summaryOf(ev, byName, await genderMap(env, org.row.id)),
+    summary,
     pending: pendingNames(roster, byName),
-    answered: Object.keys(byName).map(k => ({ name: byName[k].name, ans: byName[k].ans }))
+    // summary.answered と同じ中身。古い画面が参照しているので、この形も残す
+    answered: summary.answered
   };
 }
 
@@ -514,6 +596,8 @@ async function deleteEvent(env, b) {
 
   await env.DB.batch([
     env.DB.prepare('DELETE FROM answers WHERE org_id = ? AND event_id = ?').bind(org.row.id, ev.id),
+    // 一言も一緒に消す。残すと、作り直した同じIDのイベントに古いコメントが付く
+    env.DB.prepare('DELETE FROM notes   WHERE org_id = ? AND event_id = ?').bind(org.row.id, ev.id),
     env.DB.prepare('DELETE FROM events  WHERE org_id = ? AND id = ?').bind(org.row.id, ev.id),
     env.DB.prepare("UPDATE taikai SET event_id = '' WHERE org_id = ? AND event_id = ?")
       .bind(org.row.id, ev.id)
@@ -551,6 +635,7 @@ async function deleteOrg(env, b) {
   const id = org.row.id;
   await env.DB.batch([
     env.DB.prepare('DELETE FROM answers WHERE org_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM notes   WHERE org_id = ?').bind(id),
     env.DB.prepare('DELETE FROM links   WHERE org_id = ?').bind(id),
     env.DB.prepare('DELETE FROM events  WHERE org_id = ?').bind(id),
     env.DB.prepare('DELETE FROM taikai  WHERE org_id = ?').bind(id),
@@ -569,7 +654,7 @@ async function deleteOrg(env, b) {
 async function findOrg(env, orgId) {
   const id = String(orgId == null ? '' : orgId).trim();
   if (!id) return null;
-  return await env.DB.prepare('SELECT id, name, tz, lang FROM orgs WHERE id = ?').bind(id).first();
+  return await env.DB.prepare('SELECT id, name, tz, lang, show_names FROM orgs WHERE id = ?').bind(id).first();
 }
 
 /* 参加者に配る画面の言語。**団体ごとに1つ**。
@@ -583,12 +668,21 @@ function normLang(v) {
   return LANGS.indexOf(s) >= 0 ? s : 'ja';
 }
 
+/** on / off の値を真偽にそろえる。
+ *  D1 からは 0/1 の数で返るが、画面からは true/false や '1' で届く。
+ *  **既定は false（伏せる）。** 判断がつかない値で名前を晒さないため。 */
+function isOn(v) {
+  if (v === true || v === 1) return true;
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'on' || s === 'yes';
+}
+
 /** 合鍵を照合する。生の鍵は保存していないので、ハッシュで引く。 */
 async function authOrg(env, b) {
   const key = String(b && b.adminKey != null ? b.adminKey : '').trim();
   if (!key) return bad('keyMissing', '管理リンクが正しくありません。', null, { needKey: true });
 
-  const row = await env.DB.prepare('SELECT id, name, tz, lang FROM orgs WHERE admin_hash = ?')
+  const row = await env.DB.prepare('SELECT id, name, tz, lang, show_names FROM orgs WHERE admin_hash = ?')
     .bind(await sha256(key)).first();
 
   if (!row) {
@@ -809,6 +903,30 @@ async function latestOfEvent(env, orgId, eventId) {
   return out;
 }
 
+/** イベント1件ぶんの最新コメント。{ 名前キー: 一言 }
+ *  回答と同じく追記式なので、古い順にたどって**最後に残ったもの**が最新。
+ *  空文字が最新なら「コメントを消した」ということなので、空のまま返す。 */
+async function notesOf(env, orgId, eventId) {
+  const r = await env.DB.prepare(
+    'SELECT name, text FROM notes WHERE org_id = ? AND event_id = ? ORDER BY id'
+  ).bind(orgId, eventId).all();
+
+  const out = {};
+  for (const n of (r.results || [])) out[normKey(n.name)] = n.text || '';
+  return out;
+}
+
+/** その人の最新コメント。{ イベントID: 一言 }。「わたしの回答」で書き直せるようにするため */
+async function notesOfName(env, orgId, name) {
+  const r = await env.DB.prepare(
+    'SELECT event_id, text FROM notes WHERE org_id = ? AND name = ? ORDER BY id'
+  ).bind(orgId, name).all();
+
+  const out = {};
+  for (const n of (r.results || [])) out[n.event_id] = n.text || '';
+  return out;
+}
+
 /** 名前キー → 性別。集計を男女別にするのに使う */
 async function genderMap(env, orgId) {
   const map = {};
@@ -816,17 +934,28 @@ async function genderMap(env, orgId) {
   return map;
 }
 
-function publicEvent(ev, mine) {
+function publicEvent(ev, mine, myNote) {
   return {
     id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText,
     items: ev.items, youkou: ev.youkou, place: ev.place, address: ev.address,
     // 地図とカレンダーのボタンを画面側で組み立てるため、生の日付も渡す
-    dateRaw: ev.date, closed: ev.closed, mine: mine || null
+    dateRaw: ev.date, closed: ev.closed, mine: mine || null,
+    // 自分が前に書いた一言。書き直せるよう、そのまま入力欄に戻す
+    myNote: myNote || ''
   };
 }
 
-/** 人数だけの集計。**個人名は入れない。** 参加者にも見える応答なので、ここに名前を足さないこと。 */
-function summaryOf(ev, byName, genders) {
+/** 集計。人数は必ず出し、**回答者の名前とコメントは `withNames` のときだけ**足す。
+ *
+ *  ★ 名前を出してよいのは次の2つだけ。
+ *    - 主催者向けの応答（`adminEvents` / `tally`）… **常に出す**。
+ *      大会のメンバー選定に要るので、団体の設定に関わらず主催者には見える
+ *    - 参加者向けの `summary` … 団体が `show_names = 1` を選んだときだけ
+ *
+ *  ★ ここで出るのは**回答した人の名前だけ**。未回答者の名前は今までどおり
+ *    `pendingNames` を通して主催者向けの応答にしか入れないこと。
+ */
+function summaryOf(ev, byName, genders, withNames, notes) {
   const keys = Object.keys(byName || {});
   const items = ev.items.map(it => {
     const cell = { name: it, maru: zero(), sankaku: zero(), batsu: zero() };
@@ -842,10 +971,20 @@ function summaryOf(ev, byName, genders) {
     return cell;
   });
 
-  return {
+  const out = {
     id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText,
     youkou: ev.youkou, closed: ev.closed, respCount: keys.length, items
   };
+
+  if (withNames) {
+    out.answered = keys.map(k => ({
+      name: byName[k].name,
+      gender: genders[k] || '',
+      ans: byName[k].ans,
+      note: (notes && notes[k]) || ''
+    }));
+  }
+  return out;
 }
 
 function zero() { return { m: 0, f: 0, u: 0 }; }

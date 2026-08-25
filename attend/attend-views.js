@@ -131,6 +131,15 @@
           if ($org) $org.textContent = data.org;
           ATTEND.setTitle('statusTitle', data.org);
         }
+        /* ★ 脚注は「人数のみ表示しています」と書いてある。
+           名前を見せる団体ではこれが**嘘になる**ので、団体の設定に合わせて言い換える。
+           HTMLに直書きの文は伏せる団体（既定）ぶんの値。 */
+        var foot = o.foot || null;
+        if (foot) {
+          var key = data.showNames ? 'footStatusNames' : 'footStatus';
+          foot.setAttribute('data-i18n', key);   // あとで applyDom に戻されないように
+          foot.textContent = T(key);
+        }
         render(data.summaries || []);
       }).catch(function (err) {
         $wrap.innerHTML = ATTEND.noteHtml(T('failTitle'), String(err && err.message || err), true);

@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260829">
+<link rel="stylesheet" href="attend.css?v=20260830">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -32,6 +32,31 @@
   textarea{width:100%; min-height:96px; padding:12px; font-size:14px; border:2px solid var(--line);
            border-radius:10px; font-family:inherit; resize:vertical;}
   .pend{font-size:13.5px; color:var(--sub); margin:8px 0 0; word-break:break-word;}
+  /* 未回答者は「名前を出す」だけでは足りない。グループLINEへ貼れるようにコピーを添える
+     （こちらから催促を送る手段は持っていないので、貼るところまでを主催者に渡す） */
+  .pend-copy{margin:6px 0 0; font-size:12.5px; padding:5px 12px; width:auto;}
+  /* 団体の設定のチェック。.field > select と同じ理由で、名簿の行に効かせないよう限定する */
+  .field > .check{display:flex; gap:8px; align-items:flex-start; font-size:14.5px;
+                  line-height:1.5; font-weight:400; cursor:pointer;}
+  .field > .check input{flex:none; width:20px; height:20px; margin:1px 0 0;}
+  /* ★ 誰が〇・△・×かの一覧。**団体の設定に関わらず、ここには必ず名前が出る。**
+     男女の数だけでは、そのあとの大会のメンバーを選べないため。 */
+  .who{margin:10px 0 0; border-top:1px solid var(--line); padding:10px 0 0;}
+  .who-item{margin:0 0 10px;}
+  .who-item:last-child{margin-bottom:0;}
+  .who-item .it{font-size:13px; font-weight:700; color:var(--sub); margin:0 0 5px;}
+  .who-row{display:flex; gap:8px; align-items:baseline; margin:0 0 4px; font-size:14px;}
+  .who-row .mk{flex:none; width:1.4em; font-weight:700; text-align:center;}
+  .who-row .mk.maru{color:var(--maru);}
+  .who-row .mk.sankaku{color:var(--sankaku);}
+  .who-row .mk.batsu{color:var(--batsu);}
+  .who-row .ns{flex:1; min-width:0; word-break:break-word;}
+  .who-row .ns.none{color:var(--sub);}
+  /* 一言。誰のものか分かるよう名前を頭に置く */
+  .notes{margin:10px 0 0; border-top:1px solid var(--line); padding:10px 0 0;}
+  .notes .h{font-size:13px; font-weight:700; color:var(--sub); margin:0 0 5px;}
+  .notes .nt{font-size:14px; margin:0 0 5px; word-break:break-word; white-space:pre-line;}
+  .notes .nt b{font-weight:700;}
   .danger{border-color:var(--batsu);}
   .danger h2{color:var(--batsu);}
   .btn.warn{background:var(--batsu);}
@@ -225,6 +250,18 @@
           <option value="in">Hinglish</option>
         </select>
       </div>
+      <!-- 回答者の名前を参加者にも見せるか。**この画面（主催者）には効かない**——
+           伏せていても下の「出欠の集まり具合」には名前が出る。メンバー選定に要るため。
+           団体をつくる画面には置いていない（準備は団体名と名簿だけ、を崩さない）。
+           あとから運用に合わせて、ここで切り替えられればよい。 -->
+      <div class="field">
+        <label data-i18n="adShowNames">回答した人の名前</label>
+        <label class="check" for="edShowNames">
+          <input id="edShowNames" type="checkbox">
+          <span data-i18n="adShowNamesOn">参加者どうしでも、誰が〇・△・×かを名前で見せる</span>
+        </label>
+        <p class="hint" data-i18n="adShowNamesHint"></p>
+      </div>
       <div class="field">
         <label data-i18n="adMembersEdit">メンバー（備考に「退会」と書くと名簿から外れます）</label>
         <div id="edRows"></div>
@@ -249,8 +286,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260829"></script>
-<script src="admin-i18n.js?v=20260829"></script>
+<script src="attend.js?v=20260830"></script>
+<script src="admin-i18n.js?v=20260830"></script>
 <script>
 (function () {
   'use strict';
@@ -509,6 +546,7 @@
       $('org').textContent = d.org.name;
       $('edOrg').value = d.org.name;
       $('edLang').value = d.org.lang || 'ja';
+      $('edShowNames').checked = !!d.org.showNames;
       // 合鍵はこの端末にしか無い。サーバーは SHA-256 しか持っていないので、組み立てはここで
       $('myUrl').value = d.urls.admin || (d.urls.list.replace(/\/\?s=/, '/admin.html?s=') + '#k=' + encodeURIComponent(adminKey));
       $('u1').value = d.urls.list;
@@ -776,10 +814,69 @@
       });
   });
 
+  /* ★ 誰が〇・△・×か。**団体の「名前を伏せる」設定に関わらず、ここには必ず出す。**
+     参加者に見せる集計は男女の数だけだが、それではそのあとの大会のメンバーを選べない。
+     出す順は 〇 → △ → × （呼びたい人から先に見えるように）。
+     誰も居ない印も行ごと消さずに「—」で残す（0人なのか、まだ集計が来ていないのか、を分ける）。 */
+  function whoHtml(ev) {
+    var list = ev.answered || [];
+    if (!list.length) return '';
+    var marks = [['maru', '〇'], ['sankaku', '△'], ['batsu', '×']];
+
+    return '<div class="who">' + (ev.items || []).map(function (it) {
+      return '<div class="who-item"><div class="it">' + esc(it.name) + '</div>'
+        + marks.map(function (m) {
+            var names = list.filter(function (p) { return (p.ans || {})[it.name] === m[1]; })
+                            .map(function (p) { return p.name; });
+            return '<div class="who-row"><span class="mk ' + m[0] + '">' + m[1] + '</span>'
+              + '<span class="ns' + (names.length ? '' : ' none') + '">'
+              + esc(names.length ? names.join(T('adJoin')) : T('adWhoNone')) + '</span></div>';
+          }).join('')
+        + '</div>';
+    }).join('') + '</div>';
+  }
+
+  /* 参加者の一言。**主催者にはいつでも見せる**（伏せる設定は参加者どうしの話）。
+     「30分遅れます」「車を出せます」が届く先がここしかない。 */
+  function notesHtml(ev) {
+    var withNote = (ev.answered || []).filter(function (p) { return p.note; });
+    if (!withNote.length) return '';
+    return '<div class="notes"><div class="h">' + esc(T('adNotesHead')) + '</div>'
+      + withNote.map(function (p) {
+          return '<p class="nt"><b>' + esc(p.name) + '</b>' + esc(T('adNoteSep')) + esc(p.note) + '</p>';
+        }).join('')
+      + '</div>';
+  }
+
+  /* 文字列をそのままコピーする。既存の [data-copy] は入力欄の中身を写す仕組みなので、
+     その場で組み立てた文には使えない。押した瞬間でないと書けない端末があるため、
+     クリックの中から同期で呼ぶこと（await を挟まない）。 */
+  function copyPlain_(text, btn) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px;left:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, 99999);
+    var done = false;
+    try { done = document.execCommand('copy'); } catch (err) { done = false; }
+    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function () {});
+    document.body.removeChild(ta);
+
+    var old = btn.textContent;
+    btn.textContent = T(done || navigator.clipboard ? 'adCopied' : 'adCopyLong');
+    setTimeout(function () { btn.textContent = old; }, 1600);
+  }
+
   /* 出欠 */
+  var lastEvents_ = {};   // 直近に読んだイベント（コピーのときに引き当てる）
+
   function loadEvents() {
     withKey({ action: 'adminEvents' }).then(function (d) {
       var box = $('evList');
+      lastEvents_ = {};
+      d.events.forEach(function (ev) { lastEvents_[ev.id] = ev; });
       if (!d.events.length) {
         box.innerHTML = '<p class="hint">' + esc(T('adEvNone')) + '</p>';
         return;
@@ -797,8 +894,12 @@
           + '<div>' + state
           + ' <span class="b no">' + esc(T('adEvResp', { n: Number(ev.respCount || 0) })) + '</span></div>'
           + ATTEND.summaryHtml(ev)
+          + whoHtml(ev)
+          + notesHtml(ev)
           + (ev.pending && ev.pending.length
               ? '<p class="pend">' + esc(T('adEvPending', { n: ev.pending.length, names: ev.pending.join(T('adJoin')) })) + '</p>'
+                + '<button class="btn sub pend-copy" type="button" data-pend="' + esc(ev.id) + '">'
+                + esc(T('adEvPendCopy')) + '</button>'
               : '<p class="pend">' + esc(T('adEvAllIn')) + '</p>')
           // 締切日をすぎたぶんは再開しても受け付けられない（日付で閉じるため）。
           // 押せるように見せると混乱するので、その場合はボタンを出さない
@@ -815,6 +916,17 @@
   }
 
   $('evList').addEventListener('click', function (e) {
+    /* 未回答者の名前をコピーする。**こちらから催促を送る手段は持っていない**
+       （名前しか預かっていない。メールもLINEも集めないのが約束）。
+       貼れる形にして渡すところまでを引き受ける。 */
+    var p = e.target.closest('[data-pend]');
+    if (p) {
+      var ev = lastEvents_[p.getAttribute('data-pend')];
+      if (!ev || !ev.pending || !ev.pending.length) return;
+      copyPlain_(T('adEvPendText', { name: ev.name, names: ev.pending.join(T('adJoin')) }), p);
+      return;
+    }
+
     var d = e.target.closest('[data-evdel]');
     if (d) {
       var n = Number(d.getAttribute('data-n') || 0);
@@ -847,7 +959,7 @@
 
     this.disabled = true;
     say($('edMsg'), T('adSaving'));
-    withKey({ action: 'saveOrg', name: name, lang: $('edLang').value })
+    withKey({ action: 'saveOrg', name: name, lang: $('edLang').value, showNames: $('edShowNames').checked })
       .then(function () { return withKey({ action: 'saveMembers', members: members }); })
       .then(function () {
         $('edSave').disabled = false;
