@@ -1,0 +1,19 @@
+-- 主催者がその回だけ伝えたいこと（メモ）。
+--
+-- 「体育館の駐車場は南側を使ってください」「ゼッケンを忘れずに」のような、
+-- **要項には書いていないがその回だけ伝えたいこと**の置き場が、これまでどこにも無かった。
+-- 参加者からの一言（notes）の逆方向。
+--
+-- events に持たせる。行事（taikai）ではなくイベント（出欠を受け付けている行事）のほうで、
+-- 出欠を作ったあとに書き足せるようにするため。
+--
+-- ★ 流し方は `--file=` ではなく `--command`。
+--   `--file=` はD1のインポートAPIを使い、OAuthトークンの権限が別系統で
+--   `Authentication error [code: 10000]` になる。しかも直後に wrangler がログイン情報を
+--   出すので**成功したように見える**（2026-08-25 に踏んだ）。
+--
+--   npx wrangler d1 execute dropper-attendance --remote --command "ALTER TABLE events ADD COLUMN memo TEXT NOT NULL DEFAULT ''"
+--
+-- 流したあとは PRAGMA table_info(events) で必ず確かめること。
+-- 二度流しても duplicate column name で止まるだけで、害はない。
+ALTER TABLE events ADD COLUMN memo TEXT NOT NULL DEFAULT '';

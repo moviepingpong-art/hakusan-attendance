@@ -155,6 +155,8 @@
         return '<div class="card"><div class="card-head no-border">'
           + '<h2>' + esc(sum.name) + '</h2>'
           + ATTEND.metaHtml(sum)
+          // 主催者からの連絡事項。回答したあとに見に来る人がいるので、ここにも出す
+          + ATTEND.memoHtml(sum)
           + '</div>'
           + ATTEND.summaryHtml(sum)
           + '</div>';
