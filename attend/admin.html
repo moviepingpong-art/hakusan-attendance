@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260832">
+<link rel="stylesheet" href="attend.css?v=20260833">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -219,31 +219,22 @@
       <div id="evList"></div>
     </section>
 
-    <!-- 自分用の管理リンク。ふだんは伏せておく（肩ごしに見られる場所で開くこともある）。
+    <!-- 「あなたの管理リンク」と「みなさんに配るURL」の2節は 2026-08-25 に消した。
 
-         ★ ブックマークへの登録は**自動化できない**。ページから勝手にブックマークを
-           増やすAPIは、どのブラウザにも無い（Firefox の addPanel も IE の AddFavorite も
-           廃止済み。悪用を防ぐため意図的に塞がれている）。だから**文面でお願いする**。
+         ★ 管理リンクを消せたのは、**合鍵の持ち回りをドロッパーが引き受けた**から。
+           ドロッパーが `drive.appdata`（承認ずみのスコープ）に合鍵を預け、
+           Googleログインすれば新しい端末にも戻る（dropper-app の syncAttendKey_）。
+           そのうえで最初の画面の「🙋 出欠システムの管理へ」が `#k=` 付きで開く。
+           **ブックマークに頼らない**、というのが主催者の方針（2026-08-25 の判断）。
 
-         ★ **「アドレス欄をブックマーク」では駄目な場合がある。**
-           端末に覚えさせて開いたときは `#k=` をアドレス欄に書き戻していないので、
-           そのままブックマークすると**合鍵の無いURL**が保存される。
-           必ず下のリンクをコピーして登録してもらう。adMyBookmark にそう書いてある。 -->
-    <section class="step">
-      <h2 data-i18n="adMyTitle">あなたの管理リンク</h2>
-      <p class="hint" id="myHint"></p>
-      <button class="btn sub wide" id="myShow" type="button">管理リンクを表示する</button>
-      <div id="myBox" hidden style="margin-top:12px;">
-        <div class="urlbox">
-          <div class="t" data-i18n="adMyBoxT">あなただけのもの</div>
-          <div class="u"><input id="myUrl" type="text" readonly><button class="btn" data-copy="myUrl" type="button" data-i18n="adCopy">コピー</button></div>
-        </div>
-        <p class="hint keep" id="myBookmark"></p>
-        <p class="hint" data-i18n="adMyNote"></p>
-      </div>
-    </section>
+         ★ 承知のうえの割り切り：**この画面は単体で完結しなくなった。**
+           ドロッパーを使わない団体は、作成直後の「できあがりました」で控えを取るしかない。
+           汎用の道具としては後退だが、いまの利用者はドロッパー経由に一本化している。
 
-    <!-- 「みなさんに配るURL」の節は 2026-08-25 に消した。
+         ★ 消えたのは画面だけ。値はどちらも load() が持っている。
+           - 管理リンク … `adminKey`（記憶とURLのハッシュから）
+           - 配るURL   … `listUrl_`（tellDropper が案内文へ渡すのに使う。**消さないこと**）
+           i18n の adMy* / adUrl* も残してある。戻すときはここに節を書き直すだけでよい。 -->
          LINE公式アカウントの運用をやめ、**配るのはドロッパーの案内文（LINEタブ）から**に
          一本化したため。
          ★ 消えたのは画面だけ。値は `listUrl_` が持っている
@@ -302,8 +293,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260832"></script>
-<script src="admin-i18n.js?v=20260832"></script>
+<script src="attend.js?v=20260833"></script>
+<script src="admin-i18n.js?v=20260833"></script>
 <script>
 (function () {
   'use strict';
@@ -335,10 +326,7 @@
   function repaint() {
     $('keyWarn').innerHTML = '<b>' + esc(T('adKeyWarn1')) + '</b><br>'
       + esc(T('adKeyWarn2')) + '<b>' + esc(T('adKeyWarn3')) + '</b><br>' + esc(T('adKeyWarn4'));
-    $('myHint').innerHTML = T('adMyHint');
-    $('myBookmark').innerHTML = T('adMyBookmark');
     $('delLead').innerHTML = T('adDelLead');
-    $('myShow').textContent = T($('myBox').hidden ? 'adMyShow' : 'adMyHide');
     $('tkPasteBtn').textContent = T($('tkPaste').hidden ? 'adPasteOpen' : 'adPasteClose');
     $('tkManualBtn').textContent = T($('tkManual').hidden ? 'adManualOpen' : 'adManualClose');
     if (!$('home').hidden) { paintConn(); loadTaikai(); loadEvents(); }
@@ -600,8 +588,6 @@
       $('org').textContent = d.org.name;
       $('edOrg').value = d.org.name;
       $('edShowNames').checked = !!d.org.showNames;
-      // 合鍵はこの端末にしか無い。サーバーは SHA-256 しか持っていないので、組み立てはここで
-      $('myUrl').value = d.urls.admin || (d.urls.list.replace(/\/\?s=/, '/admin.html?s=') + '#k=' + encodeURIComponent(adminKey));
       listUrl_ = d.urls.list || '';
 
       $edRows.innerHTML = '';
@@ -775,12 +761,6 @@
       : (T('adConnOff') + (pasteTry ? T('adConnPaste') : ''));
     $('connGo').textContent = T(on ? 'adConnForget' : 'adConnRemember');
   }
-
-  $('myShow').addEventListener('click', function () {
-    var on = $('myBox').hidden;
-    show($('myBox'), on);
-    this.textContent = T(on ? 'adMyHide' : 'adMyShow');
-  });
 
 
   $('connGo').addEventListener('click', function () {
