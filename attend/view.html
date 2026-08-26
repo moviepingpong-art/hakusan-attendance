@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title data-i18n-title="vwTitle">出欠の確認（役員用）</title>
-<link rel="stylesheet" href="attend.css?v=20260839">
+<link rel="stylesheet" href="attend.css?v=20260840">
 </head>
 <body>
 
@@ -26,7 +26,7 @@
   <p class="foot" id="foot" data-i18n="vwFoot">この画面は見るだけです。回答や名簿は変えられません。</p>
 </section>
 
-<script src="attend.js?v=20260839"></script>
+<script src="attend.js?v=20260840"></script>
 <script>
 /* ===== 役員に見せる閲覧画面 =====
 
@@ -56,6 +56,7 @@
       vwTitle: '出欠の確認（役員用）',
       vwHead: '出欠の確認',
       vwFoot: 'この画面は見るだけです。回答や名簿は変えられません。',
+      vwEntryDue: '📝 申込締切：',
       vwPending: 'まだ答えていない方',
       vwPendingN: 'まだ答えていない方（{n}）',
       vwPendingNone: '全員が答えました。',
@@ -70,6 +71,7 @@
       vwTitle: 'Attendance (for officers)',
       vwHead: 'Attendance',
       vwFoot: 'This page is read-only. Answers and the roster cannot be changed here.',
+      vwEntryDue: '📝 Entry deadline: ',
       vwPending: 'Not answered yet',
       vwPendingN: 'Not answered yet ({n})',
       vwPendingNone: 'Everyone has answered.',
@@ -84,6 +86,7 @@
       vwTitle: 'Attendance (officers ke liye)',
       vwHead: 'Attendance',
       vwFoot: 'Yeh page sirf dekhne ke liye hai. Jawab aur roster yahan se nahi badal sakte.',
+      vwEntryDue: '📝 Entry deadline: ',
       vwPending: 'Abhi tak jawab nahi diya',
       vwPendingN: 'Abhi tak jawab nahi diya ({n})',
       vwPendingNone: 'Sabne jawab de diya.',
@@ -152,6 +155,10 @@
       return '<div class="card"><div class="card-head no-border">'
         + '<h2>' + esc(sum.name) + '</h2>'
         + A.metaHtml(sum)
+        // 申込締切。**役員には見せる**——編成を手伝うので、
+        // いつまでに決めなければならないかが要る。参加者には出さない
+        + (sum.entryDeadline
+            ? '<div class="meta">' + esc(T('vwEntryDue')) + esc(sum.entryDeadline) + '</div>' : '')
         + A.memoHtml(sum)
         + '</div>'
         + A.summaryHtml(sum)

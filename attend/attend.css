@@ -331,3 +331,11 @@ body.has-tabs{padding-bottom:calc(62px + env(safe-area-inset-bottom));}
   text-decoration:none;
 }
 .evlink:active{background:#e8f1f9;}
+
+/* 出欠入力の締切を直す欄（主催者の管理画面）。
+   消すボタンの真上になるので、見た目を控えめにして押し間違いを遠ざける。 */
+.due-edit{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.due-edit label{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--sub); font-weight:700; }
+.due-edit input[type=date]{ padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; }
+.due-edit .btn{ padding:7px 14px; font-size:13px; }
+.due-msg{ font-size:12.5px; margin:0; }
