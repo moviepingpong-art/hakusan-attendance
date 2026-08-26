@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS orgs (
   -- 回答者の名前を参加者にも見せるか。0=伏せる（男女の数だけ）／1=見せる。
   -- **主催者の管理画面は、この設定に関わらず必ず名前が出る**（メンバー選定に要るため）
   show_names  INTEGER NOT NULL DEFAULT 0,
+  -- 役員に見せる「閲覧リンク」の鍵のSHA-256。NULL ＝ まだ発行していない。
+  -- 合鍵とは別の鍵で、**見るだけ**。作り直せば前のリンクは使えなくなる
+  view_hash   TEXT,
   created_at  INTEGER NOT NULL,
   seen_at     INTEGER NOT NULL                -- 最終アクセス。放置ぶんの自動削除に使う
 );

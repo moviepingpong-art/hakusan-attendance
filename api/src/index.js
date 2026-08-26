@@ -98,6 +98,11 @@ async function handlePost(b, env) {
     case 'closeEvent':  return await closeEvent(env, b);
     case 'saveEventMemo': return await saveEventMemo(env, b);
     case 'deleteOrg':   return await deleteOrg(env, b);
+    /* 役員に見せる閲覧リンク。発行と取消は**合鍵が要る**が、
+       viewSummary だけは**閲覧鍵で通る**。 */
+    case 'issueViewKey':  return await issueViewKey(env, b);
+    case 'revokeViewKey': return await revokeViewKey(env, b);
+    case 'viewSummary':   return await viewSummary(env, b);
     default:
       return bad('badAction', '対応していない呼び出しです（' + action + '）。', { a: action });
   }
@@ -391,7 +396,10 @@ async function orgHome(env, b) {
     ok: true,
     org: {
       id: org.row.id, name: org.row.name, tz: org.row.tz, lang: normLang(org.row.lang),
-      showNames: isOn(org.row.show_names)
+      showNames: isOn(org.row.show_names),
+      // 閲覧リンクを発行してあるか。**鍵そのものは返さない**
+      // （生の値が出るのは発行したときの1回だけ。ここは画面の出し分けに使う）
+      hasViewKey: !!org.row.view_hash
     },
     members: await membersOf(env, org.row.id, true),
     urls: urlsFor(org.row.id, String(b.adminKey || ''))
@@ -703,7 +711,7 @@ async function authOrg(env, b) {
   const key = String(b && b.adminKey != null ? b.adminKey : '').trim();
   if (!key) return bad('keyMissing', '管理リンクが正しくありません。', null, { needKey: true });
 
-  const row = await env.DB.prepare('SELECT id, name, tz, lang, show_names FROM orgs WHERE admin_hash = ?')
+  const row = await env.DB.prepare('SELECT id, name, tz, lang, show_names, view_hash FROM orgs WHERE admin_hash = ?')
     .bind(await sha256(key)).first();
 
   if (!row) {
@@ -712,6 +720,74 @@ async function authOrg(env, b) {
       null, { needKey: true });
   }
   return { ok: true, row };
+}
+
+/* 閲覧鍵での確かめ。**合鍵とは別の入口にしてある。**
+   authOrg に「どちらの鍵でもよい」と入れないのは、将来壊し系のアクションを
+   足したときに、うっかり閲覧鍵が通る事故を防ぐため。
+   ここを通ってよいのは viewSummary だけ。 */
+async function authOrgView(env, b) {
+  const key = String(b && b.viewKey != null ? b.viewKey : '').trim();
+  if (!key) return bad('viewKeyMissing', '閲覧リンクが正しくありません。', null, { needKey: true });
+
+  const row = await env.DB.prepare('SELECT id, name, tz, lang, show_names, view_hash FROM orgs WHERE view_hash = ?')
+    .bind(await sha256(key)).first();
+
+  if (!row) {
+    return bad('viewKeyBad',
+      'この閲覧リンクは使えません。作り直された可能性があります。主催者に新しいリンクをお尋ねください。',
+      null, { needKey: true });
+  }
+  return { ok: true, row };
+}
+
+/** 閲覧リンクを発行する（合鍵が要る）。
+ *  **何度でも呼べる。呼ぶたびに前のリンクは使えなくなる**（役員の交代はこれで切る）。
+ *  生の鍵を返すのはこの応答だけ。サーバーには SHA-256 しか残らない。 */
+async function issueViewKey(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const viewKey = randomId(32);
+  await env.DB.prepare('UPDATE orgs SET view_hash = ? WHERE id = ?')
+    .bind(await sha256(viewKey), org.row.id).run();
+
+  return { ok: true, viewKey, url: viewUrlFor(org.row.id, viewKey) };
+}
+
+/** 閲覧リンクをやめる（合鍵が要る）。以後、配ったリンクはすべて開かなくなる。 */
+async function revokeViewKey(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  await env.DB.prepare('UPDATE orgs SET view_hash = NULL WHERE id = ?').bind(org.row.id).run();
+  return { ok: true, revoked: true };
+}
+
+/** 役員向けの集計。**見るだけ。書き換える口は一切無い。**
+ *
+ *  主催者の adminEvents と同じく、**名前は常に出す**（団体の show_names は
+ *  参加者向けの設定で、ここには効かない）。**未回答者の名前も出す**——
+ *  役員がこれを見るのは声かけのためなので、そこが見えないと意味がない。
+ *  参加者向けの summary とは別物なので、混ぜないこと。 */
+async function viewSummary(env, b) {
+  const org = await authOrgView(env, b);
+  if (!org.ok) return org;
+  await touch(env, org.row.id);
+
+  const genders = await genderMap(env, org.row.id);
+  const roster = await membersOf(env, org.row.id, false);
+  const summaries = [];
+
+  for (const ev of (await eventsOf(env, org.row.id, org.row.lang)).slice().reverse()) {
+    const byName = await latestOfEvent(env, org.row.id, ev.id);
+    summaries.push(Object.assign(
+      summaryOf(ev, byName, genders, true, await notesOf(env, org.row.id, ev.id)),
+      { pending: pendingNames(roster, byName) }
+    ));
+  }
+
+  return { ok: true, org: org.row.name, lang: normLang(org.row.lang), summaries };
 }
 
 async function membersOf(env, orgId, includeRetired) {
@@ -1029,6 +1105,13 @@ function notFoundEvent() {
 /** 最終アクセスを控える。放置ぶんの自動削除の判定に使う。 */
 async function touch(env, orgId) {
   await env.DB.prepare('UPDATE orgs SET seen_at = ? WHERE id = ?').bind(Date.now(), orgId).run();
+}
+
+/** 役員に渡す閲覧リンク。**鍵は # のうしろ**（合鍵と同じ扱い。
+ *  クエリに載せるとアクセスログと Referer に残る）。 */
+function viewUrlFor(orgId, viewKey) {
+  return 'https://app.dropper-tools.com/attend/view.html?s=' + encodeURIComponent(orgId)
+    + '#v=' + encodeURIComponent(viewKey);
 }
 
 function urlsFor(orgId, adminKey) {

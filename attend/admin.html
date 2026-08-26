@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260835">
+<link rel="stylesheet" href="attend.css?v=20260836">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -225,27 +225,65 @@
       <div id="evList"></div>
     </section>
 
-    <!-- 「あなたの管理リンク」と「みなさんに配るURL」の2節は 2026-08-25 に消した。
+    <!-- あなたの管理リンク。**既定は隠す**（画面を人に見せるとき、肩越しに写らないように）。
 
-         ★ 管理リンクを消せたのは、**合鍵の持ち回りをドロッパーが引き受けた**から。
-           ドロッパーが `drive.appdata`（承認ずみのスコープ）に合鍵を預け、
-           Googleログインすれば新しい端末にも戻る（dropper-app の syncAttendKey_）。
-           そのうえで最初の画面の「🙋 出欠システムの管理へ」が `#k=` 付きで開く。
-           **ブックマークに頼らない**、というのが主催者の方針（2026-08-25 の判断）。
+         ★ 2026-08-25 に一度消し、2026-08-26 に戻した。合鍵の持ち回りは
+           ドロッパーが引き受けているが、それは**ドロッパーを使う団体の話**。
+           使わない団体には控えを取る手段がここしか無く、
+           作成直後の「できあがりました」を閉じたら二度と見られなかった。
 
-         ★ 承知のうえの割り切り：**この画面は単体で完結しなくなった。**
-           ドロッパーを使わない団体は、作成直後の「できあがりました」で控えを取るしかない。
-           汎用の道具としては後退だが、いまの利用者はドロッパー経由に一本化している。
+         ★ **役員に配るのはこれではない。** これは全権の鍵で、渡すと団体ごと消せる。
+           見せるだけなら下の「役員に見せる閲覧リンク」を使う。
 
-         ★ 消えたのは画面だけ。値はどちらも load() が持っている。
-           - 管理リンク … `adminKey`（記憶とURLのハッシュから）
-           - 配るURL   … `listUrl_`（tellDropper が案内文へ渡すのに使う。**消さないこと**）
-           i18n の adMy* / adUrl* も残してある。戻すときはここに節を書き直すだけでよい。 -->
-         LINE公式アカウントの運用をやめ、**配るのはドロッパーの案内文（LINEタブ）から**に
-         一本化したため。
-         ★ 消えたのは画面だけ。値は `listUrl_` が持っている
-           （tellDropper が案内文へ渡すのに使う。**消さないこと**）。
-           i18n の adUrl* も残してある。戻すときはここに節を書き直すだけでよい。 -->
+         ★ 「みなさんに配るURL」の節は**戻していない**。配るのはドロッパーの案内文から。
+           値は `listUrl_` が持っている（tellDropper が案内文へ渡すのに使う。**消さないこと**）。
+           i18n の adUrl* も残してある。
+
+         ★ 以前、ここにあった解説のコメントが**2つ連なって壊れていた**。
+           HTMLのコメントは入れ子にできず、最初の閉じ記号で閉じるので、
+           2つ目の本文がそのまま画面に出ていた（2026-08-26 に発見・修正）。
+           **節を消すときは、残すコメントを必ず1つにまとめること。** -->
+    <section class="step">
+      <h2 data-i18n="adMyTitle">あなたの管理リンク</h2>
+      <p class="hint" id="myHint"></p>
+      <button class="btn sub wide" id="myShow" type="button"></button>
+      <div id="myBox" hidden style="margin-top:12px;">
+        <div class="urlbox">
+          <div class="t" data-i18n="adMyBoxT">あなただけのもの</div>
+          <div class="u"><input id="myUrl" type="text" readonly><button class="btn" data-copy="myUrl" type="button" data-i18n="adCopy">コピー</button></div>
+        </div>
+        <p class="hint" id="myBookmark"></p>
+        <p class="hint" id="myNote"></p>
+      </div>
+    </section>
+
+    <!-- 役員に見せる閲覧リンク。2026-08-26 に足した。
+
+         ★ **上の管理リンクを役員に配らせないためのもの。**
+           合鍵は全権で、渡すと団体ごと消せる。しかも再発行の口が無く取り消せない。
+           閲覧鍵は別の鍵で、**見るだけ**。作り直せば切れる。
+
+         ★ **生の鍵が出るのは発行したときの1回だけ。**サーバーには SHA-256 しか無い。
+           この端末にだけ控えを置く（VKEY）。控えが無ければ「作り直す」しか道は無い。 -->
+    <section class="step">
+      <h2 data-i18n="adVwTitle">役員に見せる閲覧リンク</h2>
+      <p class="hint" data-i18n="adVwLead"></p>
+      <p class="hint" id="vwSafe"></p>
+
+      <button class="btn wide" id="vwMake" type="button" data-i18n="adVwMake">閲覧リンクをつくる</button>
+
+      <div id="vwOn" hidden>
+        <div class="urlbox" id="vwBox">
+          <div class="t" data-i18n="adVwBoxT">役員に渡すリンク</div>
+          <div class="u"><input id="vwUrl" type="text" readonly><button class="btn" data-copy="vwUrl" type="button" data-i18n="adCopy">コピー</button></div>
+        </div>
+        <p class="hint" id="vwNote"></p>
+        <button class="btn sub wide" id="vwRenew" type="button" style="margin-top:8px;" data-i18n="adVwRenew">作り直す</button>
+        <button class="btn sub wide" id="vwStop" type="button" style="margin-top:8px;" data-i18n="adVwStop">閲覧をやめる</button>
+      </div>
+
+      <p class="msg" id="vwMsg"></p>
+    </section>
 
     <!-- 団体名と名簿 -->
     <section class="step">
@@ -299,8 +337,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260835"></script>
-<script src="admin-i18n.js?v=20260835"></script>
+<script src="attend.js?v=20260836"></script>
+<script src="admin-i18n.js?v=20260836"></script>
 <script>
 (function () {
   'use strict';
@@ -339,6 +377,14 @@
     [].forEach.call(document.querySelectorAll('.bulk-hint'), function (e) {
       e.innerHTML = T('adBulkHint');
     });
+    /* 管理リンクの説明。**adMyHint と adMyBookmark は <b> を含む**ので
+       data-i18n に載せられない（applyDom は textContent で入れるため、
+       タグがそのまま文字になる）。 */
+    $('myHint').innerHTML = T('adMyHint');
+    $('myBookmark').innerHTML = T('adMyBookmark');
+    $('myNote').textContent = T('adMyNote');
+    $('myShow').textContent = T($('myBox').hidden ? 'adMyShow' : 'adMyHide');
+    if (!$('home').hidden) paintView();
     $('tkPasteBtn').textContent = T($('tkPaste').hidden ? 'adPasteOpen' : 'adPasteClose');
     $('tkManualBtn').textContent = T($('tkManual').hidden ? 'adManualOpen' : 'adManualClose');
     if (!$('home').hidden) { paintConn(); loadTaikai(); loadEvents(); }
@@ -350,6 +396,11 @@
      localStorage は、ブロックされていると例外を投げずに黙って捨てる実装がある。
      書いたら読み直して確かめること。 */
   var REM = 'dropperAdminKey';   // この端末に覚えた合鍵
+  /* 閲覧鍵の控え。**団体ごと**に持つ（1つの端末で複数の団体を見ることがある）。
+     サーバーにはハッシュしか無いので、ここを失うと「作り直す」しか道が無い。 */
+  var VKEY = 'dropperViewKey:';
+  var orgId_ = '';        // 閲覧鍵の控えを引くのに使う
+  var hasView_ = false;   // サーバー側に閲覧鍵があるか
   var PEND = 'dropperPending';   // 合鍵が無いときの、取り込み待ちの置き場
   var PEND_MS = 60 * 60 * 1000;  // 1時間で捨てる。放置された行事が忘れたころに湧かないように
 
@@ -714,6 +765,73 @@
     load();
   });
 
+  /* ---------- 役員に見せる閲覧リンク ----------
+
+     状態は3つ。
+       発行していない          … 「つくる」だけ
+       発行していて控えもある  … リンク＋コピー＋作り直す＋やめる
+       発行しているが控えが無い … 作り直す＋やめる（リンクは出せない）
+
+     ★ 生の鍵は発行の応答にしか出ない。受け取ったらこの端末に控える。
+       控えは便宜でしかない——失っても「作り直す」で戻せる（合鍵と違うところ）。 */
+  function viewUrl_(key) {
+    return 'https://app.dropper-tools.com/attend/view.html?s='
+      + encodeURIComponent(orgId_) + '#v=' + encodeURIComponent(key);
+  }
+
+  function paintView() {
+    var saved = orgId_ ? pick(VKEY + orgId_) : '';
+    show($('vwOn'), hasView_);
+    show($('vwMake'), !hasView_);
+    $('vwSafe').innerHTML = T('adVwSafe');   // <b> を含むので data-i18n には載せられない
+
+    if (!hasView_) { $('vwNote').textContent = ''; return; }
+    show($('vwBox'), !!saved);
+    $('vwUrl').value = saved ? viewUrl_(saved) : '';
+    $('vwNote').textContent = T(saved ? 'adVwNote' : 'adVwLost');
+  }
+
+  function issueView_(btn) {
+    btn.disabled = true;
+    say($('vwMsg'), T('adVwMaking'));
+    withKey({ action: 'issueViewKey' }).then(function (d) {
+      // 控えられなくても進める。その場でコピーしてもらえばよい
+      store(VKEY + orgId_, d.viewKey);
+      hasView_ = true;
+      paintView();
+      $('vwUrl').value = d.url || viewUrl_(d.viewKey);
+      show($('vwBox'), true);
+      say($('vwMsg'), T('adVwMade'), 'ok');
+      btn.disabled = false;
+    }).catch(function (e) { btn.disabled = false; say($('vwMsg'), e.message, 'ng'); });
+  }
+
+  $('vwMake').addEventListener('click', function () { issueView_(this); });
+  $('vwRenew').addEventListener('click', function () {
+    if (!window.confirm(T('adVwRenewAsk'))) return;
+    issueView_(this);
+  });
+  $('vwStop').addEventListener('click', function () {
+    if (!window.confirm(T('adVwStopAsk'))) return;
+    var btn = this;
+    btn.disabled = true;
+    withKey({ action: 'revokeViewKey' }).then(function () {
+      store(VKEY + orgId_, null);
+      hasView_ = false;
+      paintView();
+      say($('vwMsg'), T('adVwStopped'), 'ok');
+      btn.disabled = false;
+    }).catch(function (e) { btn.disabled = false; say($('vwMsg'), e.message, 'ng'); });
+  });
+
+  /* ---------- 管理リンクの開閉 ----------
+     既定は隠す。この画面を人に見せる場面（役員会など）で、
+     合鍵が肩越しに写らないように。 */
+  $('myShow').addEventListener('click', function () {
+    show($('myBox'), $('myBox').hidden);
+    this.textContent = T($('myBox').hidden ? 'adMyShow' : 'adMyHide');
+  });
+
   /* ---------- コピー ---------- */
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-copy]');
@@ -745,6 +863,12 @@
       $('edOrg').value = d.org.name;
       $('edShowNames').checked = !!d.org.showNames;
       listUrl_ = d.urls.list || '';
+      /* 管理リンクはサーバーが組み立てて返す（urlsFor）。
+         合鍵はこちらが送ったものなので、保存されている値が漏れるわけではない。 */
+      $('myUrl').value = d.urls.admin || '';
+      orgId_ = d.org.id || '';
+      hasView_ = !!d.org.hasViewKey;
+      paintView();
 
       $edRows.innerHTML = '';
       (d.members || []).forEach(function (m) { memberRow($edRows, m); });
@@ -1213,6 +1337,7 @@
     this.disabled = true;
     withKey({ action: 'deleteOrg', confirm: name }).then(function () {
       if (pick(REM) === adminKey) store(REM, null);   // 消えた団体の合鍵を端末に残さない
+      if (orgId_) store(VKEY + orgId_, null);        // 閲覧鍵の控えも同じ
       document.body.innerHTML =
         '<header><h1>' + esc(T('adDelDoneT')) + '</h1></header>'
         + '<div class="wiz"><section class="step"><p>' + esc(T('adDelDoneB')) + '</p></section></div>';

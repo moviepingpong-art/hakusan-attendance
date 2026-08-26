@@ -1,0 +1,17 @@
+-- 役員に見せる「閲覧リンク」の鍵。合鍵（admin_hash）とは別に持つ。
+--
+-- 合鍵は全権で、渡すと団体ごと消せる。しかも再発行の口が無いので取り消せない。
+-- 出欠状況を見せたいだけの相手に渡すものではない、という切り分け。
+--
+-- ★ 平文は保存しない（合鍵と同じ）。NULL ＝ まだ発行していない。
+-- ★ 作り直すと前のリンクは使えなくなる。役員が交代したときはこれで切る。
+--
+-- 流し方（**--file= ではなく --command**。--file= はD1のインポートAPIを使い、
+-- OAuthトークンの権限が別系統で Authentication error [code: 10000] になる。
+-- しかも直後に wrangler がログイン情報を出すので成功したように見える）：
+--
+--   npx wrangler d1 execute <DB名> --remote \
+--     --command "ALTER TABLE orgs ADD COLUMN view_hash TEXT"
+--
+-- 流したあとは PRAGMA table_info(orgs) で必ず確かめる。
+ALTER TABLE orgs ADD COLUMN view_hash TEXT;
