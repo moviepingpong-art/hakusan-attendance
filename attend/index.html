@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title data-i18n-title="answerTitle">出欠入力</title>
-<link rel="stylesheet" href="attend.css?v=20260836">
+<link rel="stylesheet" href="attend.css?v=20260838">
 </head>
 <body class="has-tabs">
 
@@ -34,7 +34,7 @@
   <div class="wrap" id="myWrap"></div>
 </section>
 
-<!-- ③ 集まり具合（中身は attend-views.js。status.html と同じ実体） -->
+<!-- ③ みんなの回答（中身は attend-views.js。status.html と同じ実体） -->
 <section class="view" id="v-status" hidden>
   <div class="bar"><button class="refresh" id="stRefresh" type="button" data-i18n="refresh">最新に更新</button></div>
   <div class="wrap" id="stWrap"></div>
@@ -48,11 +48,11 @@
 <nav class="tabs" id="tabs">
   <button class="tab" type="button" data-tab="answer" data-i18n="tabAnswer">出欠入力</button>
   <button class="tab" type="button" data-tab="my" data-i18n="tabMy">わたしの回答</button>
-  <button class="tab" type="button" data-tab="status" data-i18n="tabStatus">出欠確認</button>
+  <button class="tab" type="button" data-tab="status" data-i18n="tabStatus">みんなの回答</button>
 </nav>
 
-<script src="attend.js?v=20260836"></script>
-<script src="attend-views.js?v=20260836"></script>
+<script src="attend.js?v=20260838"></script>
+<script src="attend-views.js?v=20260838"></script>
 <script>
 (function () {
   'use strict';
@@ -89,7 +89,7 @@
   /* ============================================================
    *  タブ
    *  3つの画面をそれぞれの器に持たせ、切り替えでは中身を捨てない。
-   *  ひとつの器を使い回すと、回答の途中で「集まり具合」を見に行った人が
+   *  ひとつの器を使い回すと、回答の途中で「みんなの回答」を見に行った人が
    *  戻ったときに、まだ送っていない〇△×を失う。
    * ========================================================== */
 

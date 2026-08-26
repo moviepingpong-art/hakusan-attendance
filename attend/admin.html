@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260836">
+<link rel="stylesheet" href="attend.css?v=20260838">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -220,9 +220,27 @@
 
     <!-- 受付中の出欠 -->
     <section class="step">
-      <h2 data-i18n="adEvTitle">出欠の集まり具合</h2>
+      <h2 data-i18n="adEvTitle">みんなの回答</h2>
       <p class="hint" data-i18n="adEvHint"></p>
       <div id="evList"></div>
+    </section>
+
+    <!-- みなさんに配る出欠回答のURL。2026-08-26 に戻した。
+
+         ★ **これだけは折りたたまない。** 上の2つ（管理リンク・閲覧リンク）は鍵で、
+           肩越しに写らないよう既定で隠してある。こちらは**秘密ではなく、配るためのもの**なので、
+           探させない。並べて見たときの「開いている／閉じている」の差が、そのまま
+           「配ってよい／渡してはいけない」の印になる。
+           （辞書の adUrlShow / adUrlHide は使っていない。折りたたむならここで使う）
+
+         ★ 値は `listUrl_`。ドロッパーへ渡す案内文（tellDropper）も同じ値を見ている。**消さないこと** -->
+    <section class="step">
+      <h2 data-i18n="adUrlTitle">出欠回答のURL</h2>
+      <p class="hint" data-i18n="adUrlHint"></p>
+      <div class="urlbox">
+        <div class="t" data-i18n="adUrl1">みなさんに配ります</div>
+        <div class="u"><input id="urlList" type="text" readonly><button class="btn" data-copy="urlList" type="button" data-i18n="adCopy">コピー</button></div>
+      </div>
     </section>
 
     <!-- あなたの管理リンク。**既定は隠す**（画面を人に見せるとき、肩越しに写らないように）。
@@ -235,9 +253,7 @@
          ★ **役員に配るのはこれではない。** これは全権の鍵で、渡すと団体ごと消せる。
            見せるだけなら下の「役員に見せる閲覧リンク」を使う。
 
-         ★ 「みなさんに配るURL」の節は**戻していない**。配るのはドロッパーの案内文から。
-           値は `listUrl_` が持っている（tellDropper が案内文へ渡すのに使う。**消さないこと**）。
-           i18n の adUrl* も残してある。
+         ★ 「出欠回答のURL」の節も 2026-08-26 に戻した（上の「みんなの回答」の直後）。
 
          ★ 以前、ここにあった解説のコメントが**2つ連なって壊れていた**。
            HTMLのコメントは入れ子にできず、最初の閉じ記号で閉じるので、
@@ -302,7 +318,7 @@
              ★ ことばが違っていたときの直し場所が、これで画面から無くなった。
                直すには saveOrg を直に叩くか、この欄を書き戻すことになる。 -->
       <!-- 回答者の名前を参加者にも見せるか。**この画面（主催者）には効かない**——
-           伏せていても下の「出欠の集まり具合」には名前が出る。メンバー選定に要るため。
+           伏せていても上の「みんなの回答」（主催者用）には名前が出る。メンバー選定に要るため。
            団体をつくる画面には置いていない（準備は団体名と名簿だけ、を崩さない）。
            あとから運用に合わせて、ここで切り替えられればよい。 -->
       <div class="field">
@@ -337,8 +353,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260836"></script>
-<script src="admin-i18n.js?v=20260836"></script>
+<script src="attend.js?v=20260838"></script>
+<script src="admin-i18n.js?v=20260838"></script>
 <script>
 (function () {
   'use strict';
@@ -852,9 +868,9 @@
   $('edAdd').addEventListener('click', function () { memberRow($edRows, null).querySelector('.mname').focus(); });
   mountBulk_($edRows, $('edAdd'));
 
-  /* 参加者に配るURL。**画面には出さないが、値は要る。**
+  /* 参加者に配るURL。**画面（出欠回答のURLの節）と案内文の両方がこの値を見ている。**
      出欠を作ったあと、ドロッパーへ渡して案内文に載せてもらう（tellDropper）。
-     消すと、LINEに貼る案内文からURLが落ちる。 */
+     消すと、案内文からURLが落ちる。 */
   var listUrl_ = '';
 
   function load() {
@@ -863,6 +879,7 @@
       $('edOrg').value = d.org.name;
       $('edShowNames').checked = !!d.org.showNames;
       listUrl_ = d.urls.list || '';
+      $('urlList').value = listUrl_;
       /* 管理リンクはサーバーが組み立てて返す（urlsFor）。
          合鍵はこちらが送ったものなので、保存されている値が漏れるわけではない。 */
       $('myUrl').value = d.urls.admin || '';

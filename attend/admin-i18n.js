@@ -54,7 +54,7 @@ ATTEND.addDict({
     // ★ この設定は**参加者どうしの見え方**だけを変える。主催者のこの画面には効かない
     adShowNames: '回答した人の名前',
     adShowNamesOn: '参加者どうしでも、誰が〇・△・×かを名前で見せる',
-    adShowNamesHint: '外すと、参加者の「出欠確認」には男女の人数だけが出ます。どちらにしても、この管理画面には名前と一言がそのまま出ます（大会のメンバーを選ぶのに要るため）。まだ答えていない方の名前は、参加者には出しません。あとから変えられます。',
+    adShowNamesHint: '外すと、参加者の「みんなの回答」には男女の人数だけが出ます。どちらにしても、この管理画面には名前と一言がそのまま出ます（大会のメンバーを選ぶのに要るため）。まだ答えていない方の名前は、参加者には出しません。あとから変えられます。',
     adMembers: 'メンバー',
     adMembersEdit: 'メンバー（備考に「退会」と書くと名簿から外れます）',
     adAddOne: '＋ 1人ふやす',
@@ -116,7 +116,7 @@ ATTEND.addDict({
     adTkMore: '新しい{n}件を出しています（全{total}件）。',
     adTkDate: '開催 ', adTkDead: '締切 ',
     adTkUnused: '未使用', adTkUsed: '✓ 出欠あり',
-    adTkLocked: '出欠を作ってあるので、この行事は消せません。消したいときは、下の「出欠の集まり具合」でこの出欠を先に消してください。',
+    adTkLocked: '出欠を作ってあるので、この行事は消せません。消したいときは、下の「みんなの回答」でこの出欠を先に消してください。',
     adTkMake: 'この行事で出欠を作る',
     adTkMaking: '作っています…',
     adTkDel: 'この行事を消す',
@@ -134,8 +134,8 @@ ATTEND.addDict({
     adTkExistsMsg: '「{name}」はすでに取り込みずみです。',
 
     /* 出欠 */
-    adEvTitle: '出欠の集まり具合',
-    adEvHint: '未回答の方のお名前が出るのはこの画面だけです。参加者には人数しか見えません。',
+    adEvTitle: 'みんなの回答',
+    adEvHint: '参加者の「みんなの回答」と同じものですが、まだ答えていない方のお名前が出るのは、この画面と、役員にお渡しする閲覧リンクだけです。',
     adEvNone: 'まだ出欠がありません。上の行事から作ってください。',
 
     /* 管理リンク */
@@ -150,10 +150,10 @@ ATTEND.addDict({
     adMyNote: '機種を替えたときや、ホーム画面のアプリで使うときは、これをコピーして「すでに団体をお持ちの方」に貼り付けてください。',
 
     /* 配るURL */
-    adUrlTitle: 'みなさんに配るURL',
+    adUrlTitle: '出欠回答のURL',
     adUrlShow: '配るURLを表示する', adUrlHide: '配るURLを隠す',
-    adUrl1: '出欠のページ',
-    adUrlHint: 'このURLはずっと変わりません。行事が増えても貼り直しは要りません。下のタブで「出欠入力」「わたしの回答」「出欠確認」に行けるので、配るのはこの1本だけです。',
+    adUrl1: 'みなさんに配ります',
+    adUrlHint: 'このURLはずっと変わりません。行事が増えても貼り直しは要りません。下のタブで「出欠入力」「わたしの回答」「みんなの回答」に行けるので、配るのはこの1本だけです。',
 
     /* 名簿 */
     adEditTitle: '団体名とメンバー',
@@ -162,7 +162,7 @@ ATTEND.addDict({
     /* 削除 */
     /* 役員に見せる閲覧リンク。**合鍵（管理リンク）とは別の鍵。** */
     adVwTitle: '役員に見せる閲覧リンク',
-    adVwLead: '出欠の集まり具合を、役員の方にも見てもらうためのリンクです。誰が〇△×か、一言、まだ答えていない方まで見えます。',
+    adVwLead: 'みんなの回答を、役員の方にも見てもらうためのリンクです。誰が〇△×か、一言、まだ答えていない方まで見えます。',
     adVwSafe: '<b>見るだけのリンクです。</b>名簿も回答も変えられず、団体を消すこともできません。<b>上の管理リンクを役員に渡さないでください</b>（あちらは団体ごと消せます）。',
     adVwMake: '閲覧リンクをつくる',
     adVwMaking: 'つくっています…',
@@ -251,7 +251,7 @@ ATTEND.addDict({
     adOrgLangHint: 'This is normally set for you from the dropper you used. It is the language of the three member screens; members choose nothing. Change it here if it is wrong.',
     adShowNames: 'Names of those who answered',
     adShowNamesOn: 'Let members see who answered yes, maybe or no, by name',
-    adShowNamesHint: 'Leave this off and the Counts screen shows members only the number of men and women. Either way, this admin page always shows the names and notes — you need them to pick a team. Names of those who have not answered are never shown to members. You can change this later.',
+    adShowNamesHint: 'Leave this off and the All answers screen shows members only the number of men and women. Either way, this admin page always shows the names and notes — you need them to pick a team. Names of those who have not answered are never shown to members. You can change this later.',
     adMembers: 'Members',
     adMembersEdit: 'Members (write “left” in the note to take someone off the roster)',
     adAddOne: '+ Add one',
@@ -308,7 +308,7 @@ ATTEND.addDict({
     adTkMore: 'Showing the {n} newest ({total} in total).',
     adTkDate: 'Date ', adTkDead: 'Deadline ',
     adTkUnused: 'Not used', adTkUsed: '✓ Attendance open',
-    adTkLocked: 'Attendance is open for this event, so it cannot be deleted. Delete the attendance first, under “Attendance so far” below.',
+    adTkLocked: 'Attendance is open for this event, so it cannot be deleted. Delete the attendance first, under “All answers” below.',
     adTkMake: 'Open attendance for this event',
     adTkMaking: 'Opening…',
     adTkDel: 'Delete this event',
@@ -325,8 +325,8 @@ ATTEND.addDict({
     adTkImportedMsg: '“{name}” imported.',
     adTkExistsMsg: '“{name}” was already imported.',
 
-    adEvTitle: 'Attendance so far',
-    adEvHint: 'This is the only screen that names the people who have not answered. Members see counts only.',
+    adEvTitle: 'All answers',
+    adEvHint: 'The same screen your members see, except that the names of people who have not answered yet appear only here and on the viewing link you give your officers.',
     adEvNone: 'No attendance yet. Open one from an event above.',
 
     adMyTitle: 'Your admin link',
@@ -336,10 +336,10 @@ ATTEND.addDict({
     adMyBookmark: '<b>Please save this as a bookmark.</b> Press Copy above, then paste it into the <b>URL field</b> of a new bookmark.<br>Bookmarking the address bar as it appears may leave out your key — always use the link above.',
     adMyNote: 'When you change phones, or use the app on your Home Screen, copy this and paste it into “Already have a group?”.',
 
-    adUrlTitle: 'Links to hand out',
+    adUrlTitle: 'Attendance link',
     adUrlShow: 'Show the URL', adUrlHide: 'Hide the URL',
-    adUrl1: 'Attendance page',
-    adUrlHint: 'This link never changes, so you never have to replace it as events come and go. The tabs at the bottom lead to Answer, My answers and Counts — this one link is all you hand out.',
+    adUrl1: 'Hand this out',
+    adUrlHint: 'This link never changes, so you never have to replace it as events come and go. The tabs at the bottom lead to Answer, My answers and All answers — this one link is all you hand out.',
 
     adEditTitle: 'Group name and members',
     adSave: 'Save', adSaving: 'Saving…', adSaved: 'Saved.',
@@ -432,7 +432,7 @@ ATTEND.addDict({
     adOrgLangHint: 'Yeh aam taur par us dropper se apne aap aa jata hai jo aapne use kiya. Teen member screen isi bhasha mein honge; members ko kuch nahi chunna. Galat ho to yahan badal lein.',
     adShowNames: 'Jinhone jawab diya, unke naam',
     adShowNamesOn: 'Members ko bhi dikhayein ki kaun 〇, △ ya × hai — naam ke saath',
-    adShowNamesHint: 'Band rakhne par Ginti screen par members ko sirf mard-aurat ki ginti dikhegi. Dono halat mein is admin page par naam aur baat waise hi dikhte hain (team chunne ke liye zaroori hai). Jinhone jawab nahi diya, unke naam members ko kabhi nahi dikhte. Baad mein badal sakte hain.',
+    adShowNamesHint: 'Band rakhne par Sabke jawab screen par members ko sirf mard-aurat ki ginti dikhegi. Dono halat mein is admin page par naam aur baat waise hi dikhte hain (team chunne ke liye zaroori hai). Jinhone jawab nahi diya, unke naam members ko kabhi nahi dikhte. Baad mein badal sakte hain.',
     adMembers: 'Members',
     adMembersEdit: 'Members (note mein “left” likhne par roster se hat jayenge)',
     adAddOne: '+ Ek aur',
@@ -489,7 +489,7 @@ ATTEND.addDict({
     adTkMore: 'Naye {n} dikha rahe hain (kul {total}).',
     adTkDate: 'Date ', adTkDead: 'Last date ',
     adTkUnused: 'Use nahi hua', adTkUsed: '✓ Attendance chalu',
-    adTkLocked: 'Is event ki attendance chalu hai, isliye ise delete nahi kar sakte. Pehle neeche “Abhi tak ki attendance” se attendance delete karein.',
+    adTkLocked: 'Is event ki attendance chalu hai, isliye ise delete nahi kar sakte. Pehle neeche “Sabke jawab” se attendance delete karein.',
     adTkMake: 'Is event ki attendance shuru karein',
     adTkMaking: 'Shuru kar rahe hain…',
     adTkDel: 'Yeh event delete karein',
@@ -506,8 +506,8 @@ ATTEND.addDict({
     adTkImportedMsg: '“{name}” import ho gaya.',
     adTkExistsMsg: '“{name}” pehle se import hai.',
 
-    adEvTitle: 'Abhi tak ki attendance',
-    adEvHint: 'Jinhone jawab nahi diya, unke naam sirf is screen par dikhte hain. Members ko sirf ginti dikhti hai.',
+    adEvTitle: 'Sabke jawab',
+    adEvHint: 'Wahi screen jo members dekhte hain — farq sirf itna ki jinhone abhi tak jawab nahi diya, unke naam sirf yahan aur officers wale viewing link par dikhte hain.',
     adEvNone: 'Abhi koi attendance nahi. Upar ke event se shuru karein.',
 
     adMyTitle: 'Aapka admin link',
@@ -517,10 +517,10 @@ ATTEND.addDict({
     adMyBookmark: '<b>Ise bookmark mein save kar lijiye.</b> Upar Copy dabayein, phir naye bookmark ke <b>URL field</b> mein paste karein.<br>Address bar ko waise hi bookmark karne par key chhut sakti hai — hamesha upar wala link use karein.',
     adMyNote: 'Phone badalne par, ya Home Screen wale app mein, ise copy karke “Pehle se group hai?” mein paste karein.',
 
-    adUrlTitle: 'Baantne wale link',
+    adUrlTitle: 'Attendance link',
     adUrlShow: 'Link dikhayein', adUrlHide: 'Link chhupayein',
-    adUrl1: 'Attendance page',
-    adUrlHint: 'Yeh link kabhi nahi badalta, event badalne par bhi nahi. Neeche ke tabs se Jawab, Mere jawab aur Ginti — teeno par ja sakte hain. Sirf yahi ek link baantna hai.',
+    adUrl1: 'Yeh baantein',
+    adUrlHint: 'Yeh link kabhi nahi badalta, event badalne par bhi nahi. Neeche ke tabs se Jawab, Mere jawab aur Sabke jawab — teeno par ja sakte hain. Sirf yahi ek link baantna hai.',
 
     adEditTitle: 'Group ka naam aur members',
     adSave: 'Save karein', adSaving: 'Save ho raha hai…', adSaved: 'Save ho gaya.',
