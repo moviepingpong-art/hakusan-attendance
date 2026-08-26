@@ -152,8 +152,8 @@ ATTEND.addDict({
     /* 配るURL */
     adUrlTitle: '出欠回答のURL',
     adUrlShow: '配るURLを表示する', adUrlHide: '配るURLを隠す',
-    adUrl1: 'みなさんに配ります',
-    adUrlHint: 'このURLはずっと変わりません。行事が増えても貼り直しは要りません。下のタブで「出欠入力」「わたしの回答」「みんなの回答」に行けるので、配るのはこの1本だけです。',
+    adUrl1: '出欠のページ',
+    adUrlHint: 'ふだんは使いません。案内文（LINE）にこのURLが自動で入るので、案内文をグループLINEへ転送すれば済みます。URLはずっと変わりません。',
 
     /* 名簿 */
     adEditTitle: '団体名とメンバー',
@@ -338,8 +338,8 @@ ATTEND.addDict({
 
     adUrlTitle: 'Attendance link',
     adUrlShow: 'Show the URL', adUrlHide: 'Hide the URL',
-    adUrl1: 'Hand this out',
-    adUrlHint: 'This link never changes, so you never have to replace it as events come and go. The tabs at the bottom lead to Answer, My answers and All answers — this one link is all you hand out.',
+    adUrl1: 'Attendance page',
+    adUrlHint: 'You will not usually need this. Event Dropper puts the link into your WhatsApp announcement automatically, so forwarding that announcement to your group is all it takes. The link never changes.',
 
     adEditTitle: 'Group name and members',
     adSave: 'Save', adSaving: 'Saving…', adSaved: 'Saved.',
@@ -519,8 +519,8 @@ ATTEND.addDict({
 
     adUrlTitle: 'Attendance link',
     adUrlShow: 'Link dikhayein', adUrlHide: 'Link chhupayein',
-    adUrl1: 'Yeh baantein',
-    adUrlHint: 'Yeh link kabhi nahi badalta, event badalne par bhi nahi. Neeche ke tabs se Jawab, Mere jawab aur Sabke jawab — teeno par ja sakte hain. Sirf yahi ek link baantna hai.',
+    adUrl1: 'Attendance page',
+    adUrlHint: 'Aam taur par iski zaroorat nahi. Event Dropper yeh link WhatsApp announcement mein apne aap daal deta hai, isliye wahi announcement group mein forward kar dena kaafi hai. Link kabhi nahi badalta.',
 
     adEditTitle: 'Group ka naam aur members',
     adSave: 'Save karein', adSaving: 'Save ho raha hai…', adSaved: 'Save ho gaya.',
