@@ -132,6 +132,23 @@
 - POSTは `Content-Type: text/plain`（プリフライトが無いぶん1往復速い。新APIは両方受ける）
 - localStorageは書いたあと読み直して確かめる（ブロック下では例外を投げず黙って捨てる実装がある）
 
+## ⚠️ public のままにすること
+
+**このリポジトリの `attend/` は dropper-app から配信されている**（ここの GitHub Pages は
+ソース置き場）。ドロッパー側を private にすると Pages が止まり、
+`app.dropper-tools.com` ごと落ちる（無料プランでは public のみ）。
+
+**public/private はコードのコピー防止に効かない。** `attend.js` も `admin.html` も
+ブラウザが誰にでも配っている。流用を止めているのは **`LICENSE`（無断利用禁止・全権利留保）**。
+
+- **`LICENSE` は3リポジトリ（dropper / dropper-app / hakusan-attendance）でバイト同一に保つ。**
+  2026-08-26 に揃えた。それまでここだけ「白山ラージボール卓球クラブ」名義で、
+  **免責条項が無かった**——3本のうち**唯一データを預かる**のがここなのに
+- **`api/src/index.js` は public だが、秘密は入っていない。** 合鍵は SHA-256 しか保存せず、
+  Cloudflare の認証は `wrangler` が持つ。`wrangler.toml` の `database_id` は識別子で、
+  触るにはアカウントの認証が要る。`.wrangler/`（認証キャッシュ）は `.gitignore` 済みで、
+  **履歴にも一度も載っていない**
+
 ## ⚠ オリジンを混ぜない
 端末IDの記憶は**アドレスの出どころごとに別物**。`app.dropper-tools.com` と
 `moviepingpong-art.github.io` の両方に同じ `attend/` があるので、配るURLは
