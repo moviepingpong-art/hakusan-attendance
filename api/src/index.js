@@ -1077,7 +1077,7 @@ function summaryOf(ev, byName, genders, withNames, notes) {
   const out = {
     id: ev.id, name: ev.name, date: ev.dateText, deadline: ev.deadlineText,
     youkou: ev.youkou, closed: ev.closed, respCount: keys.length, items,
-    // 主催者からの連絡事項。出欠確認の画面にも出す（回答したあとに見に来る人がいる）
+    // 主催者からの連絡事項。みんなの回答の画面にも出す（回答したあとに見に来る人がいる）
     memo: ev.memo || ''
   };
 

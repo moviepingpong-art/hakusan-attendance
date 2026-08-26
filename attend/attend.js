@@ -124,8 +124,8 @@ var ATTEND = (function () {
       unansweredSub: 'このイベントにはまだ回答していません',
       editAnswer: '回答を変更する',
 
-      /* 集まり具合 */
-      statusTitle: '出欠確認',
+      /* みんなの回答 */
+      statusTitle: 'みんなの回答',
       footStatus: '※ 人数のみ表示しています（どなたが回答したかは表示されません）。締切前は途中経過のため変わります。',
       // 主催者が「名前を見せる」を選んだ団体の脚注。伏せる団体の文が嘘にならないよう分けてある
       footStatusNames: '※ まだ答えていない方のお名前は出ません。締切前は途中経過のため変わります。',
@@ -133,7 +133,7 @@ var ATTEND = (function () {
       noDataBody: 'イベントが登録されると、ここに集計が出ます。',
 
       /* まとめた1本（index.html）のタブ。LINEのリッチメニューの呼び名にそろえてある */
-      tabAnswer: '出欠入力', tabMy: 'わたしの回答', tabStatus: '出欠確認'
+      tabAnswer: '出欠入力', tabMy: 'わたしの回答', tabStatus: 'みんなの回答'
     },
 
     en: {
@@ -204,13 +204,13 @@ var ATTEND = (function () {
       unansweredSub: 'You have not answered this event yet',
       editAnswer: 'Change my answer',
 
-      statusTitle: 'Counts',
+      statusTitle: 'All answers',
       footStatus: 'Counts only — who answered is never shown. Before the deadline these numbers still change.',
       footStatusNames: 'Names of people who have not answered are never shown. Before the deadline this still changes.',
       noDataTitle: 'Nothing to show yet',
       noDataBody: 'Once events are added, the counts appear here.',
 
-      tabAnswer: 'Answer', tabMy: 'My answers', tabStatus: 'Counts'
+      tabAnswer: 'Answer', tabMy: 'My answers', tabStatus: 'All answers'
     },
 
     'in': {
@@ -282,13 +282,13 @@ var ATTEND = (function () {
       unansweredSub: 'Aapne is event ka jawab nahi diya',
       editAnswer: 'Jawab badlein',
 
-      statusTitle: 'Ginti',
+      statusTitle: 'Sabke jawab',
       footStatus: 'Sirf ginti — kisne jawab diya yeh nahi dikhta. Last date se pehle ginti badalti rahegi.',
       footStatusNames: 'Jinhone jawab nahi diya unke naam nahi dikhte. Last date se pehle yeh badalta rahega.',
       noDataTitle: 'Abhi dikhane ko kuch nahi',
       noDataBody: 'Event add hone par yahan ginti aayegi.',
 
-      tabAnswer: 'Jawab', tabMy: 'Mere jawab', tabStatus: 'Ginti'
+      tabAnswer: 'Jawab', tabMy: 'Mere jawab', tabStatus: 'Sabke jawab'
     }
   };
 
