@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260834">
+<link rel="stylesheet" href="attend.css?v=20260835">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -32,6 +32,12 @@
   textarea{width:100%; min-height:96px; padding:12px; font-size:14px; border:2px solid var(--line);
            border-radius:10px; font-family:inherit; resize:vertical;}
   .pend{font-size:13.5px; color:var(--sub); margin:8px 0 0; word-break:break-word;}
+  /* 名簿のまとめて貼り付け。「＋1人ふやす」の隣に置き、ふだんは畳んでおく
+     （1人だけ足したい人のほうが多いので、開いたままにしない） */
+  .bulk{margin:10px 0 0;}
+  .bulk .bulk-text{min-height:120px; font-size:14px;}
+  .bulk .hint{margin:0 0 8px;}
+  .bulk .msg{margin:8px 0 0;}
   /* 「ブックマークに登録してください」。**なくすと復旧できない**ものの案内なので、
      ふつうの hint より目立たせる（読み飛ばされると取り返しがつかない）。 */
   .hint.keep{background:var(--sankaku-bg); border:1px solid var(--sankaku);
@@ -293,8 +299,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260834"></script>
-<script src="admin-i18n.js?v=20260834"></script>
+<script src="attend.js?v=20260835"></script>
+<script src="admin-i18n.js?v=20260835"></script>
 <script>
 (function () {
   'use strict';
@@ -327,6 +333,12 @@
     $('keyWarn').innerHTML = '<b>' + esc(T('adKeyWarn1')) + '</b><br>'
       + esc(T('adKeyWarn2')) + '<b>' + esc(T('adKeyWarn3')) + '</b><br>' + esc(T('adKeyWarn4'));
     $('delLead').innerHTML = T('adDelLead');
+    /* まとめて貼り付けの説明。**<b> を含むので data-i18n に載せられない**
+       （applyDom は textContent で入れるため、タグがそのまま文字になる）。
+       つくる画面と編集画面の2つあるので、まとめて入れ直す。 */
+    [].forEach.call(document.querySelectorAll('.bulk-hint'), function (e) {
+      e.innerHTML = T('adBulkHint');
+    });
     $('tkPasteBtn').textContent = T($('tkPaste').hidden ? 'adPasteOpen' : 'adPasteClose');
     $('tkManualBtn').textContent = T($('tkManual').hidden ? 'adManualOpen' : 'adManualClose');
     if (!$('home').hidden) { paintConn(); loadTaikai(); loadEvents(); }
@@ -474,6 +486,140 @@
     box.appendChild(row);
     return row;
   }
+  /* ===== 名簿のまとめて貼り付け =====
+
+     「主催者の準備は団体名と名簿だけ」と言いながら、**その名簿が一番重かった**。
+     1人ずつ入力で、5人目からは「＋1人ふやす」を毎回押す。40人なら36回押して40回入力。
+     Excel・メモ帳・LINEの名簿から、改行区切りで貼れるようにする。
+
+     ★ 区切りは**タブとカンマだけ。空白で切らないこと。**
+       「田中 一郎」が姓と名で2つに割れる（日本語の名前は空白を含むのが普通）。
+     ★ 判定はサーバーの normKey / normGender と**同じ規則**にそろえる。
+       ずれると、画面で通ったのに保存で弾かれる。 */
+
+  // サーバーの normKey と同じ（NFKC → 空白を全部落とす → 小文字）
+  function mKey_(s) {
+    return String(s == null ? '' : s).normalize('NFKC').replace(/[\s　]+/g, '').toLowerCase();
+  }
+  // サーバーの normGender と同じ。読めない値は空（＝未設定）にする
+  function mGender_(v) {
+    var s = mKey_(v);
+    if (/^(男|男性|m|male|おとこ)$/.test(s)) return '男';
+    if (/^(女|女性|f|female|おんな)$/.test(s)) return '女';
+    return '';
+  }
+
+  /** 貼り付けた文字を { name, gender, note } の配列にする。1行1人。 */
+  function parseRoster_(text) {
+    var out = [];
+    var lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      // タブ・カンマ（半角/全角）で列に割る。Excelからの貼り付けはタブ区切りになる
+      var cols = lines[i].split(/[\t,，]/);
+      var name = (cols[0] || '').trim();
+      if (!name) continue;
+      out.push({
+        name: name,
+        gender: (cols[1] || '').trim(),
+        note: (cols[2] || '').trim()
+      });
+    }
+    return out;
+  }
+
+  /* 解析した名前を名簿の行に足す。
+     ★ 空いている行から先に埋める（つくる画面には空の行が4つある）。
+     ★ すでにある名前は飛ばす。**サーバーは重複があると保存ごと弾く**ので、
+       40人貼って1人重複しただけで全部やり直しになってしまう。 */
+  function applyBulk_(box, text, msgEl) {
+    var parsed = parseRoster_(text);
+    if (!parsed.length) { say(msgEl, T('adBulkEmpty'), 'ng'); return; }
+
+    var rows = [].slice.call(box.querySelectorAll('.mrow'));
+    var seen = {};
+    var filled = 0;
+    rows.forEach(function (r) {
+      var v = r.querySelector('.mname').value.trim();
+      if (v) { seen[mKey_(v)] = 1; filled++; }
+    });
+    var blanks = rows.filter(function (r) { return !r.querySelector('.mname').value.trim(); });
+
+    var added = 0, dup = 0, long = 0, over = 0;
+    for (var i = 0; i < parsed.length; i++) {
+      var m = parsed[i];
+      var k = mKey_(m.name);
+      if (seen[k]) { dup++; continue; }
+      if (m.name.length > 40) { long++; continue; }   // サーバーの上限と同じ
+      if (filled + added >= MEMBERS_MAX_) { over++; continue; }
+
+      var row = blanks.length ? blanks.shift() : memberRow(box, null);
+      row.querySelector('.mname').value = m.name;
+      row.querySelector('.mgender').value = mGender_(m.gender);
+      row.querySelector('.mnote').value = m.note.slice(0, 40);
+      seen[k] = 1;
+      added++;
+    }
+
+    // 何が起きたかを1行にまとめる。飛ばしたものは**理由ごとに分けて**言う
+    var parts = [T('adBulkDone', { n: added })];
+    if (dup)  parts.push(T('adBulkDup',  { n: dup }));
+    if (long) parts.push(T('adBulkLong', { n: long }));
+    if (over) parts.push(T('adBulkMax',  { n: over, max: MEMBERS_MAX_ }));
+    say(msgEl, parts.join(''), added ? 'ok' : 'ng');
+    return added;
+  }
+
+  var MEMBERS_MAX_ = 500;   // サーバーの MEMBERS_MAX と同じ値にそろえる
+
+  /* 「まとめて貼り付け」の一式を、名簿の下に組み立てる。
+     つくる画面と編集画面の2か所で使うので、**HTMLに2度書かずJSで作る**
+     （書き分けると、片方だけ古いまま残る）。 */
+  function mountBulk_(box, addBtn) {
+    var wrap = document.createElement('div');
+    wrap.className = 'bulk';
+
+    var open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'btn sub';
+    open.setAttribute('data-i18n', 'adBulkOpen');
+    open.textContent = T('adBulkOpen');
+
+    var panel = document.createElement('div');
+    panel.hidden = true;
+    panel.style.marginTop = '10px';
+    panel.innerHTML =
+      // ★ この説明は <b> を含むので **data-i18n を付けない**。
+      //   applyDom は textContent で入れるため、タグがそのまま文字として出る。
+      //   ことばを切り替えたときは repaint() が innerHTML で入れ直す。
+      '<p class="hint bulk-hint"></p>' +
+      '<textarea class="bulk-text" rows="6" data-i18n-ph="adBulkPh"></textarea>' +
+      '<p class="msg bulk-msg"></p>' +
+      '<button class="btn wide bulk-go" type="button" data-i18n="adBulkGo"></button>';
+
+    wrap.appendChild(open);
+    wrap.appendChild(panel);
+    addBtn.parentNode.insertBefore(wrap, addBtn.nextSibling);
+
+    // ★ say() は className を 'msg …' に**置き換える**ので、bulk-msg の名前は消える。
+    //   あとから querySelector せず、ここで押さえた変数だけを使うこと。
+    var msg = panel.querySelector('.bulk-msg');
+    var ta = panel.querySelector('.bulk-text');
+    panel.querySelector('.bulk-hint').innerHTML = T('adBulkHint');
+    ta.placeholder = T('adBulkPh');
+    panel.querySelector('.bulk-go').textContent = T('adBulkGo');
+
+    open.addEventListener('click', function () {
+      var on = panel.hidden;
+      show(panel, on);
+      open.textContent = T(on ? 'adBulkClose' : 'adBulkOpen');
+      open.setAttribute('data-i18n', on ? 'adBulkClose' : 'adBulkOpen');
+      if (on) ta.focus();
+    });
+    panel.querySelector('.bulk-go').addEventListener('click', function () {
+      if (applyBulk_(box, ta.value, msg)) ta.value = '';   // 入ったぶんは消す。飛ばした行は残さない
+    });
+  }
+
   function readMembers(box) {
     return [].slice.call(box.querySelectorAll('.mrow')).map(function (r) {
       return {
@@ -526,6 +672,7 @@
   $('newAdd').setAttribute('data-add', '1');
   for (var i = 0; i < 4; i++) memberRow($newRows, null);
   $('newAdd').addEventListener('click', function () { memberRow($newRows, null).querySelector('.mname').focus(); });
+  mountBulk_($newRows, $('newAdd'));
 
   /* つくる団体の、参加者に見せることば。**主催者に選ばせない。**
      ドロッパーから来たならそのことば（`#l=`）。日本語版で作った出欠は日本語になる。
@@ -585,6 +732,7 @@
   var $edRows = $('edRows');
   $('edAdd').setAttribute('data-add', '1');
   $('edAdd').addEventListener('click', function () { memberRow($edRows, null).querySelector('.mname').focus(); });
+  mountBulk_($edRows, $('edAdd'));
 
   /* 参加者に配るURL。**画面には出さないが、値は要る。**
      出欠を作ったあと、ドロッパーへ渡して案内文に載せてもらう（tellDropper）。
