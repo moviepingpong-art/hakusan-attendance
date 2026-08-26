@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS taikai (
   id         TEXT NOT NULL,                   -- tk から始まるID
   name       TEXT NOT NULL,
   date       TEXT NOT NULL DEFAULT '',
-  deadline   TEXT NOT NULL DEFAULT '',
+  deadline   TEXT NOT NULL DEFAULT '',      -- 出欠入力の締切
+  entry_deadline TEXT,                     -- 申込締切。events へ写すまでの中継
   place      TEXT NOT NULL DEFAULT '',
   items      TEXT NOT NULL DEFAULT '',        -- 種目。読点区切り
   youkou     TEXT NOT NULL DEFAULT '',        -- 要項へのリンク
@@ -59,7 +60,11 @@ CREATE TABLE IF NOT EXISTS events (
   id         TEXT NOT NULL,
   name       TEXT NOT NULL,
   date       TEXT NOT NULL DEFAULT '',
+  -- **出欠入力の締切**。メンバーが答える期限で、isPast() で回答を止めているのはこちら
   deadline   TEXT NOT NULL DEFAULT '',
+  -- 申込締切（大会主催者へ申し込む期限）。**主催者が見るためだけで、締めには使わない**。
+  -- deadline ＝ entry_deadline − N日。逆算はイベントドロッパー側で済んでいる
+  entry_deadline TEXT,
   items      TEXT NOT NULL DEFAULT '',
   youkou     TEXT NOT NULL DEFAULT '',        -- 要項へのリンク
   place      TEXT NOT NULL DEFAULT '',        -- 会場名。回答画面の地図ボタンに使う

@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <title data-i18n-title="adTitle">出欠システムの管理</title>
-<link rel="stylesheet" href="attend.css?v=20260839">
+<link rel="stylesheet" href="attend.css?v=20260840">
 <style>
   /* 管理画面だけの見た目。共通CSSに足すと参加者ページまで太るのでここに置く */
   .tkcard{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:0 0 10px; background:#fff;}
@@ -353,8 +353,8 @@
   </div>
 </div>
 
-<script src="attend.js?v=20260839"></script>
-<script src="admin-i18n.js?v=20260839"></script>
+<script src="attend.js?v=20260840"></script>
+<script src="admin-i18n.js?v=20260840"></script>
 <script>
 (function () {
   'use strict';
@@ -1230,7 +1230,11 @@
       box.innerHTML = d.events.map(function (ev) {
         var meta = [];
         if (ev.date) meta.push(T('adTkDate') + ev.date);
-        if (ev.deadline) meta.push(T('adTkDead') + ev.deadline);
+        /* ★ 締切は2つある。ラベルを分けないと取り違える。
+           adEvDue （出欠入力の締切） … メンバーが答える期限。**回答が止まるのはこちら**
+           adTkDead（申込締切）     … 大会主催者へ申し込む期限。見るだけ */
+        if (ev.deadline) meta.push(T('adEvDue') + ev.deadline);
+        if (ev.entryDeadline) meta.push(T('adTkDead') + ev.entryDeadline);
         // 「手で締めた」と「締切日をすぎた」は分けて出す。
         // 同じ「締切ずみ」に見えると、再開できるのかどうか分からない
         var state = '<span class="b ' + (ev.manualClosed || ev.datePassed ? 'no' : 'yes') + '">'
@@ -1255,6 +1259,12 @@
               : '<button class="btn sub wide" style="margin-top:10px;" data-close="' + esc(ev.id) + '" data-now="'
                 + (ev.manualClosed ? '1' : '0') + '" type="button">'
                 + esc(T(ev.manualClosed ? 'adEvReopen' : 'adEvClose')) + '</button>')
+          /* 出欠入力の締切をあとから直す。集まりが悪いときに延ばせるため。
+             **申込締切は直せない**——あちらは要項に書いてある事実で、こちらで決めるものではない。 */
+          + '<div class="due-edit"><label>' + esc(T('adEvDueEdit'))
+          +   '<input type="date" data-due="' + esc(ev.id) + '" value="' + esc(ev.deadlineRaw || '') + '"></label>'
+          +   '<button class="btn sub" type="button" data-duesave="' + esc(ev.id) + '">' + esc(T('adSave')) + '</button>'
+          +   '<span class="msg due-msg" data-duemsg="' + esc(ev.id) + '"></span></div>'
           + '<button class="btn sub wide del-ev" style="margin-top:8px;" data-evdel="' + esc(ev.id) + '" data-name="'
           + esc(ev.name) + '" data-n="' + Number(ev.respCount || 0) + '" type="button">' + esc(T('adEvDel')) + '</button>'
           + '</div>';
@@ -1262,7 +1272,31 @@
     }).catch(function () { /* 画面上部で伝えるので、ここでは黙る */ });
   }
 
+  /* 出欠入力の締切を保存する。**空でも送れる**（締切無しに戻す）。
+     ★ 保存後に loadEvents() しないこと。一覧を作り直すと、開いていた他の行の
+       入力中の値やスクロール位置が飛ぶ。結果はその行だけに書き戻す。 */
+  function saveDue_(id, btn) {
+    var input = $('evList').querySelector('[data-due="' + id + '"]');
+    var msg = $('evList').querySelector('[data-duemsg="' + id + '"]');
+    if (!input) return;
+    btn.disabled = true;
+    if (msg) { msg.textContent = T('adSaving'); msg.className = 'msg due-msg'; }
+    withKey({ action: 'saveEventDeadline', eventId: id, deadline: input.value })
+      .then(function (d) {
+        if (msg) { msg.textContent = T('adSaved'); msg.className = 'msg due-msg ok'; }
+        // 表示上の締切もその場で合わせる（一覧を作り直さないため）
+        if (lastEvents_[id]) { lastEvents_[id].deadline = d.deadlineText; lastEvents_[id].deadlineRaw = d.deadline; }
+        btn.disabled = false;
+      })
+      .catch(function (err) {
+        if (msg) { msg.textContent = err.message; msg.className = 'msg due-msg ng'; }
+        btn.disabled = false;
+      });
+  }
+
   $('evList').addEventListener('click', function (e) {
+    var due = e.target.closest('[data-duesave]');
+    if (due) { saveDue_(due.getAttribute('data-duesave'), due); return; }
     /* 未回答者の名前をコピーする。**こちらから催促を送る手段は持っていない**
        （名前しか預かっていない。メールもLINEも集めないのが約束）。
        貼れる形にして渡すところまでを引き受ける。 */

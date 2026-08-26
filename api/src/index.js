@@ -97,6 +97,7 @@ async function handlePost(b, env) {
     case 'tally':       return await tally(env, b);
     case 'closeEvent':  return await closeEvent(env, b);
     case 'saveEventMemo': return await saveEventMemo(env, b);
+    case 'saveEventDeadline': return await saveEventDeadline(env, b);
     case 'deleteOrg':   return await deleteOrg(env, b);
     /* 役員に見せる閲覧リンク。発行と取消は**合鍵が要る**が、
        viewSummary だけは**閲覧鍵で通る**。 */
@@ -472,7 +473,7 @@ async function importTaikai(env, b) {
   }
 
   return await addTaikaiRow(env, org.row.id, {
-    name: o.name, date: o.date, deadline: o.deadline, place: o.place,
+    name: o.name, date: o.date, deadline: o.deadline, entryDeadline: o.entryDeadline, place: o.place,
     items: o.items, youkou: o.youkou, detail: o.detail ? JSON.stringify(o.detail) : ''
   });
 }
@@ -482,7 +483,7 @@ async function addTaikaiManually(env, b) {
   const org = await authOrg(env, b);
   if (!org.ok) return org;
   return await addTaikaiRow(env, org.row.id, {
-    name: b.name, date: b.date, deadline: b.deadline,
+    name: b.name, date: b.date, deadline: b.deadline, entryDeadline: b.entryDeadline,
     place: b.place, items: b.items, youkou: b.youkou, detail: ''
   });
 }
@@ -506,6 +507,7 @@ async function createEventFromTaikai(env, b) {
     name: t.name,
     date: (o.date != null ? toYmd(o.date) : t.date),
     deadline: (o.deadline != null ? toYmd(o.deadline) : t.deadline),
+    entryDeadline: (o.entryDeadline != null ? toYmd(o.entryDeadline) : t.entryDeadline),
     items,
     youkou: t.youkou,
     place: t.place,
@@ -521,6 +523,29 @@ async function createEventFromTaikai(env, b) {
   return { ok: true, eventId: res.eventId, existing: !!res.existing, name: t.name, items };
 }
 
+
+/** 出欠入力の締切を直す。**申込締切（entry_deadline）は動かさない**——
+ *  あちらは要項に書いてある事実で、こちらで決めるものではない。
+ *
+ *  空を送れば締切無しに戻せる（開催日で締まる、以前の振る舎い）。
+ *  **過去の日も拒まない。** その場で締めたいことがある。 */
+async function saveEventDeadline(env, b) {
+  const org = await authOrg(env, b);
+  if (!org.ok) return org;
+
+  const ev = await findEvent(env, org.row.id, b.eventId);
+  if (!ev) return notFoundEvent();
+
+  const raw = String(b.deadline == null ? '' : b.deadline).trim();
+  const ymd = raw ? toYmd(raw) : '';
+  if (raw && !ymd) return bad('deadlineBad', '締切の日付を読み取れませんでした。');
+
+  await env.DB.prepare('UPDATE events SET deadline = ? WHERE org_id = ? AND id = ?')
+    .bind(ymd, org.row.id, ev.id).run();
+  await touch(env, org.row.id);
+
+  return { ok: true, deadline: ymd, deadlineText: fmtDate(ymd, org.row.lang) };
+}
 
 /** 行事を消す。**出欠を作ったあとは消せない**（先に出欠のほうを消してもらう）。
  *  順番を守らせないと、出欠だけが親なしで残って画面から辿れなくなる。 */
@@ -563,6 +588,11 @@ async function adminEvents(env, b) {
       {
         manualClosed: ev.manualClosed,
         datePassed: ev.datePassed,
+        // 申込締切は**主催者と役員にだけ**見せる。参加者には出さない
+        // （どちらの締切か分からなくなるため）
+        entryDeadline: ev.entryDeadlineText,
+        // 締切を直す日付欄に入れる値。YYYY-MM-DD のまま渡す
+        deadlineRaw: ev.deadline,
         pending: pendingNames(roster, byName)
       }
     ));
@@ -783,7 +813,7 @@ async function viewSummary(env, b) {
     const byName = await latestOfEvent(env, org.row.id, ev.id);
     summaries.push(Object.assign(
       summaryOf(ev, byName, genders, true, await notesOf(env, org.row.id, ev.id)),
-      { pending: pendingNames(roster, byName) }
+      { pending: pendingNames(roster, byName), entryDeadline: ev.entryDeadlineText }
     ));
   }
 
@@ -853,16 +883,20 @@ function normalizeMembers(raw) {
  *  date/deadline は中では 'YYYY-MM-DD'、外に出すときは GAS版と同じ 'YYYY/MM/DD（曜）'。 */
 async function eventsOf(env, orgId, lang) {
   const r = await env.DB.prepare(
-    'SELECT id, name, date, deadline, items, youkou, place, address, memo, closed FROM events WHERE org_id = ?'
+    'SELECT id, name, date, deadline, entry_deadline, items, youkou, place, address, memo, closed FROM events WHERE org_id = ?'
   ).bind(orgId).all();
 
   return (r.results || []).map(e => ({
     id: e.id,
     name: e.name,
     date: e.date || '',
+    // **出欠入力の締切**。回答を止めているのはこちらで、参加者に見せるのもこちら
     deadline: e.deadline || '',
+    // 申込締切。**主催者の画面にだけ出す**。締めの判定には使わない
+    entryDeadline: e.entry_deadline || '',
     dateText: fmtDate(e.date, lang),
     deadlineText: fmtDate(e.deadline, lang),
+    entryDeadlineText: fmtDate(e.entry_deadline, lang),
     items: splitItems(e.items),
     youkou: e.youkou || '',
     place: e.place || '',
@@ -882,7 +916,7 @@ async function eventsOf(env, orgId, lang) {
 /** 行事。新しい順。 */
 async function taikaiOf(env, orgId, lang) {
   const r = await env.DB.prepare(
-    'SELECT id, name, date, deadline, place, items, youkou, detail, event_id, created_at'
+    'SELECT id, name, date, deadline, entry_deadline, place, items, youkou, detail, event_id, created_at'
     + ' FROM taikai WHERE org_id = ? ORDER BY created_at DESC, rowid DESC'
   ).bind(orgId).all();
 
@@ -891,8 +925,10 @@ async function taikaiOf(env, orgId, lang) {
     name: t.name,
     date: t.date || '',
     deadline: t.deadline || '',
+    entryDeadline: t.entry_deadline || '',
     dateText: fmtDate(t.date, lang),
     deadlineText: fmtDate(t.deadline, lang),
+    entryDeadlineText: fmtDate(t.entry_deadline, lang),
     place: t.place || '',
     address: addressOf(t.detail),
     memo: memoOf(t.detail),
@@ -915,10 +951,10 @@ async function addTaikaiRow(env, orgId, a) {
 
   const id = 'tk' + randomId(8);
   await env.DB.prepare(
-    'INSERT INTO taikai (org_id,id,name,date,deadline,place,items,youkou,detail,event_id,created_at)'
-    + ' VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+    'INSERT INTO taikai (org_id,id,name,date,deadline,entry_deadline,place,items,youkou,detail,event_id,created_at)'
+    + ' VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
   ).bind(
-    orgId, id, name, date, toYmd(a.deadline),
+    orgId, id, name, date, toYmd(a.deadline), toYmd(a.entryDeadline),
     String(a.place == null ? '' : a.place).trim(),
     toItems(a.items).join('、'),
     normUrl(a.youkou),
@@ -938,9 +974,9 @@ async function addEventRow(env, orgId, a) {
 
   const id = 'ev' + randomId(8);
   await env.DB.prepare(
-    'INSERT INTO events (org_id,id,name,date,deadline,items,youkou,place,address,memo,closed,created_at)'
-    + ' VALUES (?,?,?,?,?,?,?,?,?,?,0,?)'
-  ).bind(orgId, id, a.name, a.date, a.deadline, a.items.join('、'),
+    'INSERT INTO events (org_id,id,name,date,deadline,entry_deadline,items,youkou,place,address,memo,closed,created_at)'
+    + ' VALUES (?,?,?,?,?,?,?,?,?,?,?,0,?)'
+  ).bind(orgId, id, a.name, a.date, a.deadline, toYmd(a.entryDeadline), a.items.join('、'),
          a.youkou || '', a.place || '', a.address || '', cleanMemo(a.memo), Date.now()).run();
 
   return { ok: true, eventId: id, existing: false };

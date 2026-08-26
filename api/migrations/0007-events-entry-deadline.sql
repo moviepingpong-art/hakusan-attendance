@@ -1,0 +1,28 @@
+-- 申込締切（大会主催者へ申し込む期限）を、出欠入力の締切とは別に持つ。
+--
+-- ★ 締切は2つある。取り違えると回答が早く締まる／遅く締まる。
+--   events.deadline       … **出欠入力の締切**（メンバーが答える期限）。
+--                            isPast() で回答を止めているのはこちら。**意味を変えない。**
+--   events.entry_deadline … 申込締切。**主催者が見るためだけ**で、締めには使わない。
+--
+--   出欠入力の締切 ＝ 申込締切 − N日（Nは主催者が決める）。逆算はイベントドロッパー側で
+--   済ませてあり、ここには結果の日付が入る。
+--
+-- 流し方（**--file= ではなく --command**。--file= はD1のインポートAPIを使い、
+-- OAuthトークンの権限が別系統で Authentication error [code: 10000] になる。
+-- しかも直後に wrangler がログイン情報を出すので成功したように見える）：
+--
+--   npx wrangler d1 execute dropper-attendance --remote \
+--     --command "ALTER TABLE events ADD COLUMN entry_deadline TEXT"
+--   npx wrangler d1 execute dropper-attendance --remote \
+--     --command "ALTER TABLE taikai ADD COLUMN entry_deadline TEXT"
+--
+-- ★ **2本ある。** taikai は行事の控えで、ドロッパーから届いた値をいったんここへ置き、
+--   createEventFromTaikai が events へ写す。**片方だけ足すと、申込締切が途中で落ちる。**
+--
+-- 流したあとは PRAGMA table_info(events) で必ず確かめる。
+--
+-- 既存の行は NULL。これまでの出欠は deadline に申込締切が入っているので、
+-- **さかのぼって直さない**（回答が締まる日を後から動かすことになるため）。
+ALTER TABLE events ADD COLUMN entry_deadline TEXT;
+ALTER TABLE taikai ADD COLUMN entry_deadline TEXT;
