@@ -129,6 +129,9 @@ ATTEND.addDict({
     adEvDue: '出欠入力の締切：',
     adEvDueEdit: '出欠入力の締切を直す',
     adMkName: '行事名', adMkDate: '開催日', adMkDead: '申込締切',
+    /* 逆算した出欠入力の締切。**入力欄のすぐ下に出す**——案内文に出る締切が
+       入力した日と違うことに、主催者が驚かないようにするため。 */
+    adMkDueHint: '→ 出欠入力の締切は {date} になります（回答はこの日で止まります）',
     adMkPlace: '会場（回答画面の地図ボタンに使います）',
     adMkItems: '種目（読点で区切る。空なら「参加」）',
     adMkGo: 'この行事を追加',
@@ -323,6 +326,7 @@ ATTEND.addDict({
     adEvDue: 'Answers due: ',
     adEvDueEdit: 'Change the answer deadline',
     adMkName: 'Event name', adMkDate: 'Date', adMkDead: 'Deadline',
+    adMkDueHint: '→ Members can reply until {date}',
     adMkPlace: 'Venue (used for the map button on the answer screen)',
     adMkItems: 'Entries (comma separated; “Attend” if left empty)',
     adMkGo: 'Add this event',
@@ -506,6 +510,7 @@ ATTEND.addDict({
     adEvDue: 'Jawab ki last date: ',
     adEvDueEdit: 'Jawab ki last date badlein',
     adMkName: 'Event ka naam', adMkDate: 'Date', adMkDead: 'Last date',
+    adMkDueHint: '→ Members {date} tak jawab de sakte hain',
     adMkPlace: 'Jagah (jawab screen ke map button ke liye)',
     adMkItems: 'Entries (comma se alag; khali chhoda to “Attend”)',
     adMkGo: 'Yeh event add karein',
