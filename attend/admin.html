@@ -210,7 +210,10 @@
       <div id="tkManual" hidden style="margin-top:12px;">
         <div class="field"><label for="mkName" data-i18n="adMkName">行事名</label><input id="mkName" type="text" autocomplete="off"></div>
         <div class="field"><label for="mkDate" data-i18n="adMkDate">開催日</label><input id="mkDate" type="date"></div>
-        <div class="field"><label for="mkDead" data-i18n="adMkDead">申込締切</label><input id="mkDead" type="date"></div>
+        <div class="field"><label for="mkDead" data-i18n="adMkDead">申込締切</label><input id="mkDead" type="date">
+          <!-- ★ 逆算した結果を**その場で見せる。** 見せないと、案内文に出てくる締切が
+               入力した日と違うことに主催者が驚く（何日前かは端末に覚えた設定で決まる）。 -->
+          <p class="hint" id="mkDueHint"></p></div>
         <div class="field"><label for="mkPlace" data-i18n="adMkPlace">会場（回答画面の地図ボタンに使います）</label><input id="mkPlace" type="text" autocomplete="off"></div>
         <div class="field"><label for="mkItems" data-i18n="adMkItems">種目（読点で区切る。空なら「参加」）</label><input id="mkItems" type="text" autocomplete="off"></div>
         <p class="msg" id="mkMsg"></p>
@@ -354,7 +357,7 @@
 </div>
 
 <script src="attend.js?v=20260840"></script>
-<script src="admin-i18n.js?v=20260840"></script>
+<script src="admin-i18n.js?v=20260841"></script>
 <script>
 (function () {
   'use strict';
@@ -1020,10 +1023,18 @@
      ★ 出欠を入力するURLも一緒に渡す。LINEの無い国では、案内文にこのURLが要る
      （リッチメニューが無いので、書かないと参加者はどこからも辿り着けない）。
      団体につき1本で行事が増えても変わらないので、渡すのはこれだけでよい。 */
-  function tellDropper(name, date) {
+  function tellDropper(name, date, extra) {
     // 出欠を入力するURL。画面には出していないので、load() が控えた値から取る
     var url = listUrl_ || '';
     var note = { name: name, date: date, url: url, at: Date.now() };
+    /* ★ 会場・種目・申込締切も渡す。**チラシを読まずに来た人**には、
+       向こうにカードが無い。この印だけが案内文の材料になる（2026-09-06）。
+       ドロッパー由来の行事では向こうがすでに持っているので、あっても害は無い。 */
+    if (extra) {
+      note.place = extra.place || '';
+      note.items = extra.items || '';
+      note.deadline = extra.deadline || '';
+    }
     store('dropperAttendDone', JSON.stringify(note));
     var o = opener();
     if (o) {
@@ -1031,6 +1042,19 @@
         o.postMessage({ type: 'attend-created', name: name, date: date, url: url }, location.origin);
       } catch (e) { /* noop */ }
     }
+  }
+
+  /* ドロッパーから来た人を、案内文づくりへ返す。
+     ★ 戻り先はドロッパーが置いていく（言語ごとにURLが違うので、こちらでは組み立てない）。
+       置いていないなら**動かない**——管理リンクから直接来た人を、知らない画面へ飛ばさない。
+     ★ 印は1回きり。戻ったあとに残っていると、次に開いたとき古い行事の案内文が出る。 */
+  function backToDropper() {
+    var to = '';
+    try { to = localStorage.getItem('dropperReturnUrl') || ''; } catch (e) { to = ''; }
+    if (!to) return false;
+    try { localStorage.removeItem('dropperReturnUrl'); } catch (e) { /* noop */ }
+    location.href = to;
+    return true;
   }
 
   $('tkInGo').addEventListener('click', function () {
@@ -1043,7 +1067,11 @@
         for (var i = 0; i < tkRows.length; i++) {
           if (tkRows[i].id === b.getAttribute('data-mk')) row = tkRows[i];
         }
-        if (row) tellDropper(row.name, row.date);
+        if (row) {
+          tellDropper(row.name, row.date, {
+            place: row.place, items: row.items, deadline: row.entryDeadline || row.deadline
+          });
+        }
 
         show($('tkInGo'), false);
         loadTaikai();
@@ -1114,17 +1142,51 @@
 
   $('tkManualBtn').addEventListener('click', function () { openManual_($('tkManual').hidden); });
 
+  /* 申込締切から「何日前」を引いて、出欠入力の締切を出す。
+     ★ 日数はドロッパーが端末に覚えた値（dropperEntryBackDays、既定7）。
+       ここに独自の設定を作らない——2か所に持つと必ず食い違う。
+     ★ 読めない日付は**そのまま返す**。空にすると締切が消えて、回答が止まらなくなる。 */
+  function entryDueFrom_(ymd) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || '').trim());
+    if (!m) return ymd || '';
+    var n = 7;
+    try { n = parseInt(localStorage.getItem('dropperEntryBackDays'), 10); } catch (e) { n = 7; }
+    if (!(n >= 0 && n <= 60)) n = 7;
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    d.setDate(d.getDate() - n);
+    var p = function (v) { return (v < 10 ? '0' : '') + v; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  function paintMkDue_() {
+    var el = $('mkDueHint'); if (!el) return;
+    var v = $('mkDead').value;
+    var due = v ? entryDueFrom_(v) : '';
+    el.textContent = (due && due !== v) ? T('adMkDueHint', { date: due }) : '';
+  }
+  $('mkDead').addEventListener('change', paintMkDue_);
+  $('mkDead').addEventListener('input', paintMkDue_);
+
   $('mkGo').addEventListener('click', function () {
     var name = $('mkName').value.trim();
     if (!name) { say($('mkMsg'), T('adMkNeedName'), 'ng'); return; }
     this.disabled = true;
+    /* ★ 締切は2つある。混ぜない（CLAUDE.md）。
+         入力欄は**申込締切** → entry_deadline
+         そこから逆算した日が**出欠入力の締切** → deadline（回答を止めるのはこちら）
+       こうするとチラシありの道と同じ動きになる（あちらはドロッパーが逆算して両方渡す）。
+       ★ 何日前かはドロッパーが端末に覚えている値をそのまま読む。**同じオリジンなので読める。**
+         こちらに設定を増やすと、2か所で食い違う。 */
     withKey({
       action: 'addTaikaiManually', name: name,
-      date: $('mkDate').value, deadline: $('mkDead').value,
+      date: $('mkDate').value,
+      deadline: entryDueFrom_($('mkDead').value),
+      entryDeadline: $('mkDead').value,
       place: $('mkPlace').value, items: $('mkItems').value
     }).then(function (d) {
       $('mkName').value = ''; $('mkDate').value = ''; $('mkDead').value = '';
       $('mkPlace').value = ''; $('mkItems').value = '';
+      paintMkDue_();
       say($('mkMsg'), T(d.existing ? 'adMkExists' : 'adMkAdded'), 'ok');
       $('mkGo').disabled = false;
       loadTaikai();
@@ -1148,7 +1210,22 @@
     b.disabled = true;
     b.textContent = T('adTkMaking');
     withKey({ action: 'createEventFromTaikai', taikaiId: b.getAttribute('data-mk') })
-      .then(function () { loadTaikai(); loadEvents(); })
+      .then(function () {
+        /* ★ ここでも tellDropper を呼ぶ（2026-09-06）。それまで呼んでいたのは
+           tkInGo（ドロッパーから届いた行事）だけで、**手で入れた行事から出欠を
+           作っても案内文が作られなかった**。 */
+        var row = null;
+        for (var i = 0; i < tkRows.length; i++) {
+          if (tkRows[i].id === b.getAttribute('data-mk')) row = tkRows[i];
+        }
+        if (row) {
+          tellDropper(row.name, row.date, {
+            place: row.place, items: row.items, deadline: row.entryDeadline || row.deadline
+          });
+          if (backToDropper()) return;   // 案内文づくりへ返す。戻り先が無ければこのまま
+        }
+        loadTaikai(); loadEvents();
+      })
       .catch(function (err) {
         b.disabled = false;
         b.textContent = T('adTkMake');
