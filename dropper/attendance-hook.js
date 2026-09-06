@@ -1,4 +1,4 @@
-/* 出欠ドロッパー連携フック v2.1
+/* 出欠システム連携フック v2.1
    イベントドロッパー（dropper-app の calendar/）に読み込ませて使う小さなモジュール。
 
      AttendanceHook.saveToken(ev)   読み取った内容を、受け渡し用の文字列にする

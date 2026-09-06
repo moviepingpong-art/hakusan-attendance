@@ -1,5 +1,5 @@
 /**
- * 出欠ドロッパー — API（Cloudflare Worker）
+ * 出欠システム — API（Cloudflare Worker）
  *
  * GAS版（gas/attendance-api.gs）の置き換え。**同じ action 名・同じ応答の形**をわざと守っている。
  * 参加者側の attend/*.html はURLの組み立てだけ差し替えれば動く。
