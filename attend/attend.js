@@ -1,4 +1,4 @@
-/* 出欠ドロッパー 共通ロジック v2.0
+/* 出欠システム 共通ロジック v2.0
    - ?s= は団体ID。呼び先は api.dropper-tools.com の1本
    - 参加者の識別は端末ID（localStorageのUUID）。LINE・LIFFには一切依存しない
 

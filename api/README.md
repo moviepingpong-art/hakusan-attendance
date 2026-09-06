@@ -1,4 +1,4 @@
-# 出欠ドロッパー API（Cloudflare Worker）
+# 出欠システム API（Cloudflare Worker）
 
 GAS版の置き換え。計画の全体像は [`../docs/backend-plan.md`](../docs/backend-plan.md)。
 

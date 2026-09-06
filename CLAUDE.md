@@ -1,7 +1,7 @@
 # hakusan-attendance CLAUDE.md
 
 ## これは何か
-**出欠ドロッパー**（汎用の出欠システム）のソース。どの団体でも使える。LINE・LIFF非依存。
+**出欠システム**（汎用の出欠システム）のソース。どの団体でも使える。LINE・LIFF非依存。
 - `attend/` 参加者・主催者向けの静的ページ ／ `api/` Cloudflare Worker と D1
 - 主催者の画面は `attend/admin.html`。**合鍵つきのリンク1本**で開く
 - `dropper/attendance-hook.js` イベントドロッパーへ貼る連携モジュールの**原本**

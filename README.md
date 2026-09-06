@@ -1,6 +1,6 @@
 # hakusan-attendance
 
-**出欠ドロッパー** — 案内文にリンクを1本足すだけの出欠システム。どの団体でも使えます。
+**出欠システム** — 案内文にリンクを1本足すだけの出欠システム。どの団体でも使えます。
 LINE・LIFF には依存しません。
 
 公開先：[app.dropper-tools.com/attend/](https://app.dropper-tools.com/attend/)
