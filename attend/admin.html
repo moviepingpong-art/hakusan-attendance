@@ -1020,10 +1020,18 @@
      ★ 出欠を入力するURLも一緒に渡す。LINEの無い国では、案内文にこのURLが要る
      （リッチメニューが無いので、書かないと参加者はどこからも辿り着けない）。
      団体につき1本で行事が増えても変わらないので、渡すのはこれだけでよい。 */
-  function tellDropper(name, date) {
+  function tellDropper(name, date, extra) {
     // 出欠を入力するURL。画面には出していないので、load() が控えた値から取る
     var url = listUrl_ || '';
     var note = { name: name, date: date, url: url, at: Date.now() };
+    /* ★ 会場・種目・申込締切も渡す。**チラシを読まずに来た人**には、
+       向こうにカードが無い。この印だけが案内文の材料になる（2026-09-06）。
+       ドロッパー由来の行事では向こうがすでに持っているので、あっても害は無い。 */
+    if (extra) {
+      note.place = extra.place || '';
+      note.items = extra.items || '';
+      note.deadline = extra.deadline || '';
+    }
     store('dropperAttendDone', JSON.stringify(note));
     var o = opener();
     if (o) {
@@ -1031,6 +1039,19 @@
         o.postMessage({ type: 'attend-created', name: name, date: date, url: url }, location.origin);
       } catch (e) { /* noop */ }
     }
+  }
+
+  /* ドロッパーから来た人を、案内文づくりへ返す。
+     ★ 戻り先はドロッパーが置いていく（言語ごとにURLが違うので、こちらでは組み立てない）。
+       置いていないなら**動かない**——管理リンクから直接来た人を、知らない画面へ飛ばさない。
+     ★ 印は1回きり。戻ったあとに残っていると、次に開いたとき古い行事の案内文が出る。 */
+  function backToDropper() {
+    var to = '';
+    try { to = localStorage.getItem('dropperReturnUrl') || ''; } catch (e) { to = ''; }
+    if (!to) return false;
+    try { localStorage.removeItem('dropperReturnUrl'); } catch (e) { /* noop */ }
+    location.href = to;
+    return true;
   }
 
   $('tkInGo').addEventListener('click', function () {
@@ -1043,7 +1064,11 @@
         for (var i = 0; i < tkRows.length; i++) {
           if (tkRows[i].id === b.getAttribute('data-mk')) row = tkRows[i];
         }
-        if (row) tellDropper(row.name, row.date);
+        if (row) {
+          tellDropper(row.name, row.date, {
+            place: row.place, items: row.items, deadline: row.entryDeadline || row.deadline
+          });
+        }
 
         show($('tkInGo'), false);
         loadTaikai();
@@ -1148,7 +1173,22 @@
     b.disabled = true;
     b.textContent = T('adTkMaking');
     withKey({ action: 'createEventFromTaikai', taikaiId: b.getAttribute('data-mk') })
-      .then(function () { loadTaikai(); loadEvents(); })
+      .then(function () {
+        /* ★ ここでも tellDropper を呼ぶ（2026-09-06）。それまで呼んでいたのは
+           tkInGo（ドロッパーから届いた行事）だけで、**手で入れた行事から出欠を
+           作っても案内文が作られなかった**。 */
+        var row = null;
+        for (var i = 0; i < tkRows.length; i++) {
+          if (tkRows[i].id === b.getAttribute('data-mk')) row = tkRows[i];
+        }
+        if (row) {
+          tellDropper(row.name, row.date, {
+            place: row.place, items: row.items, deadline: row.entryDeadline || row.deadline
+          });
+          if (backToDropper()) return;   // 案内文づくりへ返す。戻り先が無ければこのまま
+        }
+        loadTaikai(); loadEvents();
+      })
       .catch(function (err) {
         b.disabled = false;
         b.textContent = T('adTkMake');
