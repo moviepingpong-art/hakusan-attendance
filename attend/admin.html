@@ -779,7 +779,22 @@
     try { history.replaceState(null, '', 'admin.html#k=' + encodeURIComponent(adminKey)); } catch (e) { /* noop */ }
     show($('keyScreen'), false);
     load();
+    /* ★ つくった直後は「＋ 手で入力して追加」を**開いておく**（2026-09-06、利用者の判断）。
+       ドロッパーの最初の画面「チラシなしで、出欠だけを集める」から来た人は、
+       **要項を1枚も読んでいない**。行事は手で入れる以外に無いのに、畳んだままだと
+       名簿はできたのに行事が無い画面で止まる。
+       ★ 開くのはここだけ。2回目以降は畳んだまま——ドロッパーから届く行事のほうが
+         主な道で、常に開くとそちらの人に余計な欄を見せることになる。
+       ★ focus は当てない。スマホでキーボードが跳ね上がって、上の説明が隠れる。 */
+    openManual_(true);
   });
+
+  /* 「＋ 手で入力して追加」の開け閉め。ボタンの文字も一緒に変える。 */
+  function openManual_(on) {
+    if ($('tkManual').hidden !== on) return;   // すでにその状態なら何もしない
+    show($('tkManual'), on);
+    $('tkManualBtn').textContent = T(on ? 'adManualClose' : 'adManualOpen');
+  }
 
   /* ---------- 役員に見せる閲覧リンク ----------
 
@@ -1097,11 +1112,7 @@
     if (on) $('tkToken').focus();
   });
 
-  $('tkManualBtn').addEventListener('click', function () {
-    var on = $('tkManual').hidden;
-    show($('tkManual'), on);
-    this.textContent = T(on ? 'adManualClose' : 'adManualOpen');
-  });
+  $('tkManualBtn').addEventListener('click', function () { openManual_($('tkManual').hidden); });
 
   $('mkGo').addEventListener('click', function () {
     var name = $('mkName').value.trim();
