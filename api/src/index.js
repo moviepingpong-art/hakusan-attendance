@@ -149,11 +149,15 @@ async function ping(env, orgId) {
   return { ok: true, org: org.name, lang: normLang(org.lang), version: API_VERSION };
 }
 
+/** 参加者が自分の名前を選ぶための名簿。**名前だけを返す。**
+ *  団体のURLを知っていれば誰でも呼べるので、主催者の備考（note）や性別は出さない。
+ *  画面（attend/index.html）が使うのも名前だけで、性別は register でサーバーが名簿から引き直す。 */
 async function publicMembers(env, orgId) {
   const org = await findOrg(env, orgId);
   if (!org) return notFoundOrg();
   await touch(env, org.id);
-  return { ok: true, org: org.name, lang: normLang(org.lang), members: await membersOf(env, org.id, false) };
+  const members = (await membersOf(env, org.id, false)).map(m => ({ name: m.name }));
+  return { ok: true, org: org.name, lang: normLang(org.lang), members };
 }
 
 /** 受付中の一覧。締切をすぎたものは出さない（GAS版と同じ） */
