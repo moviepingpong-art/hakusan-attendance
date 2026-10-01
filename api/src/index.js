@@ -29,6 +29,24 @@ const MEMBERS_MAX = 500;
 /** 行事の一覧に出す件数。これより古いものは画面に出さない（GAS版と同じ） */
 const TAIKAI_LIST_MAX = 30;
 
+/** 長さの上限。**誰でも送れる値が際限なく太らないように。**
+ *  端末IDは画面が UUID（36字）で作るので、それより余裕を持たせてある。
+ *  行事の項目はドロッパーの読み取り結果がたまたま長くても取り込みが止まらないよう、断らずに切る。 */
+const DEVICE_ID_MAX = 64;
+const TAIKAI_TEXT_MAX = 100;     // 行事名・会場
+const ITEMS_MAX = 30;            // 種目の数
+const ITEM_MAX = 40;             // 種目1つの長さ
+const URL_MAX = 1000;            // 要項のURL。超えたら空にする
+const PASTE_MAX = 40000;         // ドロッパーからの貼り付け（importTaikai の token）
+
+/** 回数の上限を掛ける書き込み口と、使う設定（wrangler.toml の [[ratelimits]]）。
+ *  **鍵が無くても呼べる口だけ。** 主催者の操作は合鍵が要るので数えない。 */
+const RATE_LIMITED = {
+  createOrg: 'CREATE_LIMIT',
+  register:  'WRITE_LIMIT',
+  answer:    'WRITE_LIMIT'
+};
+
 
 /* ============================================================
  *  入口
@@ -47,7 +65,13 @@ export default {
         return json(await handleGet(url, env), 200, origin);
       }
       if (request.method === 'POST') {
-        return json(await handlePost(await readBody(request), env), 200, origin);
+        const body = await readBody(request);
+        if (!(await withinRate(request, env, body.action))) {
+          // 画面の辞書に無い code なので、この文がそのまま出る。英語の団体の人にも読めるよう2つの言葉で書く
+          return json(bad('tooMany',
+            'アクセスが多すぎます。少し待ってからお試しください。／Too many requests. Please wait a moment.'), 429, origin);
+        }
+        return json(await handlePost(body, env), 200, origin);
       }
       return json(bad('badMethod', '対応していない呼び出しです。'), 405, origin);
 
@@ -248,6 +272,8 @@ async function register(env, b) {
   const deviceId = String(b.deviceId == null ? '' : b.deviceId).trim();
   const name = String(b.name == null ? '' : b.name).trim();
   if (!deviceId) return { ok: false, code: 'noDevice', error: '端末IDがありません。ブラウザを更新してからもう一度お試しください。' };
+  // 画面が作る端末IDは UUID（36字）。それより長いものは画面から来たものではない
+  if (deviceId.length > DEVICE_ID_MAX) return bad('badDevice', '端末IDが正しくありません。ブラウザを更新してからもう一度お試しください。');
   if (!name) return { ok: false, code: 'noName', error: 'お名前が選ばれていません。' };
 
   const mem = (await membersOf(env, org.id, false)).find(m => normKey(m.name) === normKey(name));
@@ -460,6 +486,9 @@ async function importTaikai(env, b) {
 
   const raw = String(b.token == null ? '' : b.token).trim();
   if (!raw) return bad('pasteEmpty', '貼り付ける内容がありません。');
+  // ふつうの要項は数千字。これを超えるものは読み取り結果ではないので、解く前に断る
+  if (raw.length > PASTE_MAX) return bad('pasteBad',
+    'うまく読み取れませんでした。イベントドロッパーの「出欠システムに保存」でコピーした内容を、そのまま貼り付けてください。');
 
   let o = null;
   try {
@@ -941,7 +970,7 @@ async function taikaiOf(env, orgId, lang) {
 
 /** 行事を1行足す。**同じ行事名・同じ開催日は増やさない**（二重に取り込みがちなので） */
 async function addTaikaiRow(env, orgId, a) {
-  const name = String(a.name == null ? '' : a.name).trim();
+  const name = String(a.name == null ? '' : a.name).trim().slice(0, TAIKAI_TEXT_MAX);
   if (!name) return bad('taikaiNameEmpty', '行事名が読み取れませんでした。');
 
   const date = toYmd(a.date);
@@ -955,7 +984,7 @@ async function addTaikaiRow(env, orgId, a) {
     + ' VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
   ).bind(
     orgId, id, name, date, toYmd(a.deadline), toYmd(a.entryDeadline),
-    String(a.place == null ? '' : a.place).trim(),
+    String(a.place == null ? '' : a.place).trim().slice(0, TAIKAI_TEXT_MAX),
     toItems(a.items).join('、'),
     normUrl(a.youkou),
     a.detail ? String(a.detail).slice(0, 20000) : '',
@@ -1199,10 +1228,11 @@ function splitItems(v) {
   return String(v == null ? '' : v).split(/[、,，\n\/／]+/).map(s => s.trim()).filter(Boolean);
 }
 
-/** 配列でも読点区切りの文字列でも受ける */
+/** 配列でも読点区切りの文字列でも受ける。**受け取る口なので数と長さを切る**
+ *  （保存ずみの値を読むほうは splitItems。こちらは通らない） */
 function toItems(v) {
-  if (Array.isArray(v)) return v.map(s => String(s).trim()).filter(Boolean);
-  return splitItems(v);
+  const list = Array.isArray(v) ? v.map(s => String(s).trim()).filter(Boolean) : splitItems(v);
+  return list.slice(0, ITEMS_MAX).map(s => s.slice(0, ITEM_MAX));
 }
 
 /** 読み取り結果（JSON）から会場の住所を拾う。無ければ空。
@@ -1238,7 +1268,8 @@ function cleanMemo(v) {
 
 function normUrl(v) {
   const s = String(v == null ? '' : v).trim();
-  return /^https?:\/\//i.test(s) ? s : '';
+  // 長すぎるものは途中で切ると別のURLになるので、切らずに空にする
+  return (/^https?:\/\//i.test(s) && s.length <= URL_MAX) ? s : '';
 }
 
 /** いろいろな書き方の日付を 'YYYY-MM-DD' に寄せる。読めなければ空 */
@@ -1324,6 +1355,18 @@ async function readBody(request) {
   } catch (e) {
     return {};
   }
+}
+
+/** 回数の上限の内か。**数えるのは RATE_LIMITED にある口だけ。**
+ *  送り手の IP は数える鍵に使うだけで、保存しない。
+ *  設定（wrangler.toml の [[ratelimits]]）が無いとき（手元で動かすとき）は数えずに通す。 */
+async function withinRate(request, env, action) {
+  const name = RATE_LIMITED[String(action || '').trim()];
+  const limiter = name && env[name];
+  if (!limiter) return true;
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const { success } = await limiter.limit({ key: ip });
+  return success;
 }
 
 function originOf(request) {
